@@ -88,7 +88,7 @@ export class GoogleClient {
     packageName: string,
     editId: string,
     language: string,
-    listing: { title?: string; shortDescription?: string; fullDescription?: string },
+    listing: { title?: string; shortDescription?: string; fullDescription?: string; video?: string },
   ) {
     const res = await this.publisher.edits.listings.update({
       packageName, editId, language,
@@ -285,12 +285,36 @@ export class GoogleClient {
     return res.data;
   }
 
-  async createSubscription(packageName: string, productId: string, subscription: androidpublisher_v3.Schema$Subscription) {
+  async createSubscription(
+    packageName: string,
+    productId: string,
+    subscription: androidpublisher_v3.Schema$Subscription,
+    regionsVersionVersion: string = '2022/02',
+  ) {
     const res = await this.publisher.monetization.subscriptions.create({
       packageName,
       productId,
+      'regionsVersion.version': regionsVersionVersion,
       requestBody: subscription,
     });
+    return res.data;
+  }
+
+  async patchSubscription(
+    packageName: string,
+    productId: string,
+    subscription: androidpublisher_v3.Schema$Subscription,
+    updateMask?: string,
+    regionsVersionVersion?: string,
+  ) {
+    const params: any = {
+      packageName,
+      productId,
+      requestBody: subscription,
+    };
+    if (updateMask) params.updateMask = updateMask;
+    if (regionsVersionVersion) params['regionsVersion.version'] = regionsVersionVersion;
+    const res = await this.publisher.monetization.subscriptions.patch(params);
     return res.data;
   }
 
@@ -302,14 +326,51 @@ export class GoogleClient {
     return res.data;
   }
 
-  // ─── Reviews ───
-  async listReviews(packageName: string) {
-    const res = await this.publisher.reviews.list({ packageName });
-    return res.data.reviews ?? [];
+  // ─── Subscription Base Plans ───
+  async activateBasePlan(
+    packageName: string,
+    productId: string,
+    basePlanId: string,
+  ) {
+    const res = await this.publisher.monetization.subscriptions.basePlans.activate({
+      packageName,
+      productId,
+      basePlanId,
+      requestBody: { packageName, productId, basePlanId },
+    });
+    return res.data;
   }
 
-  async getReview(packageName: string, reviewId: string) {
-    const res = await this.publisher.reviews.get({ packageName, reviewId });
+  async deactivateBasePlan(packageName: string, productId: string, basePlanId: string) {
+    const res = await this.publisher.monetization.subscriptions.basePlans.deactivate({
+      packageName,
+      productId,
+      basePlanId,
+      requestBody: { packageName, productId, basePlanId },
+    });
+    return res.data;
+  }
+
+  // ─── Reviews ───
+  async listReviews(
+    packageName: string,
+    opts: { maxResults?: number; startIndex?: number; token?: string; translationLanguage?: string } = {},
+  ) {
+    const res = await this.publisher.reviews.list({
+      packageName,
+      maxResults: opts.maxResults,
+      startIndex: opts.startIndex,
+      token: opts.token,
+      translationLanguage: opts.translationLanguage,
+    });
+    return {
+      reviews: res.data.reviews ?? [],
+      nextPageToken: res.data.tokenPagination?.nextPageToken ?? null,
+    };
+  }
+
+  async getReview(packageName: string, reviewId: string, translationLanguage?: string) {
+    const res = await this.publisher.reviews.get({ packageName, reviewId, translationLanguage });
     return res.data;
   }
 
