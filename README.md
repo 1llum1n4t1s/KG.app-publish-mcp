@@ -36,7 +36,7 @@ Use this MCP when you need to:
 | Age Rating | `apple_get_age_rating`, `apple_update_age_rating` |
 | Review Info | `apple_update_review_detail` |
 | Submission | `apple_submit_for_review`, `apple_cancel_submission` |
-| Pricing | `apple_get_pricing`, `apple_set_price`, `apple_list_availability` |
+| Pricing | `apple_get_pricing`, `apple_get_app_price_points`, `apple_set_price`, `apple_list_availability` |
 | Customer Reviews | `apple_list_reviews`, `apple_respond_to_review` |
 | Certificates | `apple_list_certificates`, `apple_create_certificate`, `apple_revoke_certificate` |
 | Provisioning Profiles | `apple_list_profiles`, `apple_create_profile`, `apple_delete_profile` |

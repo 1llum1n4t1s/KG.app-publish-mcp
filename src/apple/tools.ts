@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { createHash } from 'crypto';
+import { readFileSync } from 'fs';
 import { AppleClient } from './client.js';
 
 // Helper to define a tool
@@ -309,9 +311,21 @@ const uploadScreenshot: ToolDef = {
     screenshotSetId: z.string().describe('Screenshot Set ID'),
     filePath: z.string().describe('Local path to the screenshot image'),
     fileName: z.string().describe('File name (e.g. screen1.png)'),
-    fileSize: z.number().describe('File size in bytes'),
+    fileSize: z.number().optional().describe('File size in bytes (defaults to the actual size of filePath)'),
   }),
   handler: async (client, args) => {
+    // Read the asset once: its byte length seeds the reservation and its MD5 is
+    // required to commit (App Store Connect never fills sourceFileChecksum for us).
+    const fileBytes = readFileSync(args.filePath);
+    const sourceFileChecksum = createHash('md5').update(fileBytes).digest('hex');
+
+    if (args.fileSize !== undefined && args.fileSize !== fileBytes.length) {
+      throw new Error(
+        `fileSize ${args.fileSize} does not match ${args.filePath} (${fileBytes.length} bytes). ` +
+          'Omit fileSize to use the actual file length.',
+      );
+    }
+
     // Step 1: Reserve screenshot
     const reservation = await client.request('/appScreenshots', {
       method: 'POST',
@@ -320,7 +334,7 @@ const uploadScreenshot: ToolDef = {
           type: 'appScreenshots',
           attributes: {
             fileName: args.fileName,
-            fileSize: args.fileSize,
+            fileSize: fileBytes.length,
           },
           relationships: {
             appScreenshotSet: {
@@ -350,7 +364,7 @@ const uploadScreenshot: ToolDef = {
           id: screenshot.id,
           attributes: {
             uploaded: true,
-            sourceFileChecksum: screenshot.attributes.sourceFileChecksum,
+            sourceFileChecksum,
           },
         },
       },
@@ -619,37 +633,57 @@ const getAppPricing: ToolDef = {
   },
 };
 
-const setAppPrice: ToolDef = {
-  name: 'apple_set_price',
-  description: 'Set app price (free or paid). Use price tier ID from Apple price points.',
+const getAppPricePoints: ToolDef = {
+  name: 'apple_get_app_price_points',
+  description:
+    'List available price points for an app, per territory. Use the returned price point ID together with its territory as the baseTerritory for apple_set_price.',
   schema: z.object({
     appId: z.string().describe('App ID'),
-    priceTierId: z.string().describe('Price tier ID (use "0" for free)'),
-    startDate: z.string().optional().describe('ISO 8601 start date'),
+    territoryFilter: z.string().optional().describe('Filter by territory ID, e.g. USA (comma-separated for several)'),
+    limit: z.number().optional().describe('Max results (API max is 200)'),
   }),
   handler: async (client, args) => {
-    return client.request(`/apps/${args.appId}/appPriceSchedule`, {
+    const params: Record<string, string> = { include: 'territory' };
+    if (args.territoryFilter) params['filter[territory]'] = args.territoryFilter;
+    if (args.limit) params['limit'] = String(args.limit);
+    return client.request(`/apps/${args.appId}/appPricePoints`, { params });
+  },
+};
+
+const setAppPrice: ToolDef = {
+  name: 'apple_set_price',
+  description:
+    'Set app price by creating an app price schedule. Takes a price point ID from apple_get_app_price_points plus the matching base territory. The legacy price-tier model (appPriceTiers) was retired.',
+  schema: z.object({
+    appId: z.string().describe('App ID'),
+    pricePointId: z.string().describe('Price point ID from apple_get_app_price_points'),
+    baseTerritoryId: z.string().describe('Base territory ID that the price point belongs to, e.g. USA'),
+    startDate: z.string().optional().describe('ISO 8601 start date (omit to start immediately)'),
+  }),
+  handler: async (client, args) => {
+    return client.request('/appPriceSchedules', {
       method: 'POST',
       body: {
         data: {
           type: 'appPriceSchedules',
           relationships: {
             app: { data: { type: 'apps', id: args.appId } },
+            baseTerritory: { data: { type: 'territories', id: args.baseTerritoryId } },
             manualPrices: {
-              data: [{ type: 'appPrices', id: '${new}' }],
+              data: [{ type: 'appPrices', id: '${price-0}' }],
             },
           },
         },
         included: [
           {
             type: 'appPrices',
-            id: '${new}',
+            id: '${price-0}',
             attributes: {
               startDate: args.startDate ?? null,
             },
             relationships: {
-              priceTier: {
-                data: { type: 'appPriceTiers', id: args.priceTierId },
+              appPricePoint: {
+                data: { type: 'appPricePoints', id: args.pricePointId },
               },
             },
           },
@@ -666,7 +700,9 @@ const listTerritoryAvailability: ToolDef = {
     appId: z.string().describe('App ID'),
   }),
   handler: async (client, args) => {
-    return client.request(`/apps/${args.appId}/availableTerritoriesV2`);
+    return client.request(`/apps/${args.appId}/appAvailabilityV2`, {
+      params: { include: 'territoryAvailabilities' },
+    });
   },
 };
 
@@ -1567,7 +1603,7 @@ export const appleTools: ToolDef[] = [
   // Submission
   submitForReview, cancelSubmission,
   // Pricing & Availability
-  getAppPricing, setAppPrice, listTerritoryAvailability,
+  getAppPricing, getAppPricePoints, setAppPrice, listTerritoryAvailability,
   // Customer Reviews
   listCustomerReviews, respondToReview,
   // Bundle ID Capabilities
