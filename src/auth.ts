@@ -11,6 +11,7 @@
 
 import { OAuth2Client } from 'google-auth-library';
 import { createServer } from 'http';
+import { execFile } from 'child_process';
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
@@ -43,8 +44,31 @@ export function loadSavedGoogleToken(): TokenStore | null {
 }
 
 function saveToken(token: TokenStore): void {
-  mkdirSync(CONFIG_DIR, { recursive: true });
-  writeFileSync(GOOGLE_TOKEN_PATH, JSON.stringify(token, null, 2));
+  // These are long-lived OAuth credentials — keep them owner-only.
+  mkdirSync(CONFIG_DIR, { recursive: true, mode: 0o700 });
+  writeFileSync(GOOGLE_TOKEN_PATH, JSON.stringify(token, null, 2), { mode: 0o600 });
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/** Open a URL in the user's default browser without passing it through a shell. */
+function openBrowser(url: string): void {
+  if (process.platform === 'darwin') {
+    execFile('open', [url]);
+  } else if (process.platform === 'win32') {
+    // cmd's `start` treats the first quoted argument as the window title,
+    // so the empty title placeholder is required before the URL.
+    execFile('cmd', ['/c', 'start', '', url]);
+  } else {
+    execFile('xdg-open', [url]);
+  }
 }
 
 async function authGoogle(clientId: string, clientSecret: string): Promise<void> {
@@ -71,7 +95,7 @@ async function authGoogle(clientId: string, clientSecret: string): Promise<void>
 
       if (error) {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-        res.end(`<h1>Authentication failed</h1><p>${error}</p><p>You can close this tab.</p>`);
+        res.end(`<h1>Authentication failed</h1><p>${escapeHtml(error)}</p><p>You can close this tab.</p>`);
         server.close();
         reject(new Error(`Auth failed: ${error}`));
         return;
@@ -101,11 +125,7 @@ async function authGoogle(clientId: string, clientSecret: string): Promise<void>
       console.log('\n🔐 Opening browser for Google authentication...\n');
       console.log(`If the browser doesn't open, visit:\n${authUrl}\n`);
 
-      // Open browser
-      const { exec } = require('child_process');
-      const cmd = process.platform === 'darwin' ? 'open' :
-                  process.platform === 'win32' ? 'start' : 'xdg-open';
-      exec(`${cmd} "${authUrl}"`);
+      openBrowser(authUrl);
     });
 
     // Timeout after 2 minutes
