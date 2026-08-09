@@ -44,7 +44,7 @@
     "README.md"
   ],
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.12.1",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "google-auth-library": "^11.0.0",
     "googleapis": "^174.0.1",
     "jsonwebtoken": "^9.0.2",
