@@ -308,7 +308,8 @@ const getTrack: ToolDef = {
 
 const createRelease: ToolDef = {
   name: 'google_create_release',
-  description: 'Create a release on a track with optional version codes and release notes',
+  description:
+    'Create a release on a track with optional version codes and release notes. This replaces the track\'s release list, so it refuses to run while a staged rollout of different version codes is in progress — halt or complete that rollout first.',
   schema: z.object({
     packageName: z.string().describe('Android package name'),
     editId: z.string().describe('Edit ID'),
@@ -330,6 +331,24 @@ const createRelease: ToolDef = {
     if (args.releaseNotes) release.releaseNotes = args.releaseNotes;
     if (args.userFraction) release.userFraction = args.userFraction;
     if (args.releaseName) release.name = args.releaseName;
+
+    // tracks.update is a PUT: the releases we send replace the track's list wholesale.
+    // Silently discarding an in-flight staged rollout would end it, so refuse unless
+    // this call is advancing that same rollout (identical version codes).
+    const trackData = await client.getTrack(args.packageName, args.editId, args.track);
+    const inProgress = trackData.releases?.find(r => r.status === 'inProgress');
+    if (inProgress) {
+      const ongoing = [...(inProgress.versionCodes ?? [])].sort().join(',');
+      const incoming = [...(args.versionCodes ?? [])].sort().join(',');
+      if (ongoing !== incoming) {
+        throw new Error(
+          `Track "${args.track}" has a staged rollout in progress (version codes ${ongoing || 'unknown'}` +
+            `${inProgress.userFraction != null ? `, userFraction ${inProgress.userFraction}` : ''}). ` +
+            'Creating a release here would replace it. Halt it with google_halt_release, complete it, ' +
+            'or pass the same versionCodes to advance the existing rollout.',
+        );
+      }
+    }
 
     return client.updateTrack(args.packageName, args.editId, args.track, [release]);
   },

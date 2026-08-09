@@ -1,6 +1,18 @@
 import { google, androidpublisher_v3 } from 'googleapis';
 import { GoogleAuth, OAuth2Client } from 'google-auth-library';
 import { readFileSync } from 'fs';
+import { extname } from 'path';
+
+/** Play Console accepts PNG and JPEG store assets; pick by extension, fall back to PNG. */
+function imageMimeType(imagePath: string): string {
+  switch (extname(imagePath).toLowerCase()) {
+    case '.jpg':
+    case '.jpeg':
+      return 'image/jpeg';
+    default:
+      return 'image/png';
+  }
+}
 
 export interface GoogleClientOptions {
   serviceAccountPath?: string;
@@ -147,7 +159,7 @@ export class GoogleClient {
     imageType: string,
     imagePath: string,
   ) {
-    const media = { mimeType: 'image/png', body: readFileSync(imagePath) };
+    const media = { mimeType: imageMimeType(imagePath), body: readFileSync(imagePath) };
     const res = await this.publisher.edits.images.upload({
       packageName, editId, language, imageType,
       media,
