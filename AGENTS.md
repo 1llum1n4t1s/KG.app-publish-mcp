@@ -11,6 +11,8 @@ This repository provides the `@kagayoi/app-publish-mcp` stdio MCP server. Read
 - `src/apple/` and `src/google/` contain platform clients and declarative tool
   registries. Keep API transport details in `client.ts` and MCP schemas/handlers
   in `tools.ts`.
+- `test/` contains the automated Node test-runner coverage for tool contracts,
+  authentication, error handling, and platform client behavior.
 - `server.json`, `smithery.yaml`, `glama.json`, and `llms.txt` describe the
   published server. `.github/workflows/npm-publish.yml` is the npm release path.
 
@@ -42,11 +44,12 @@ Run from the repository root:
 ```powershell
 npm ci
 npm run lint
+npm test
 npm run build
 npm pack --dry-run
 git diff --check
 ```
 
-There is currently no automated test script. For runtime or protocol changes,
-also initialize the built stdio server with an MCP client and exercise the
-affected tool path against an appropriately authorized account or a safe fixture.
+For runtime or protocol changes, add or update automated coverage, initialize the
+built stdio server with an MCP client, and exercise the affected tool path against
+an appropriately authorized account or a safe fixture.
