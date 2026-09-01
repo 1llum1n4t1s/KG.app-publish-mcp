@@ -9,7 +9,7 @@
   "mcpServers": {
     "app-publish-mcp": {
       "command": "npx",
-      "args": ["-y", "app-publish-mcp"],
+      "args": ["--yes", "@kagayoi/app-publish-mcp@latest"],
       "env": {
         "APPLE_KEY_ID": "YOUR_KEY_ID",
         "APPLE_ISSUER_ID": "YOUR_ISSUER_ID",

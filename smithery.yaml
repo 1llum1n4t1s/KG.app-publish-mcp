@@ -22,4 +22,4 @@ startCommand:
         description: Path to Google Play service account JSON key file
   commandFunction:
     |-
-    config => ({ command: 'npx', args: ['-y', 'app-publish-mcp'], env: { APPLE_KEY_ID: config.appleKeyId || '', APPLE_ISSUER_ID: config.appleIssuerId || '', APPLE_P8_PATH: config.appleP8Path || '', APPLE_VENDOR_NUMBER: config.appleVendorNumber || '', GOOGLE_SERVICE_ACCOUNT_PATH: config.googleServiceAccountPath || '' } })
+    config => ({ command: 'npx', args: ['-y', '@kagayoi/app-publish-mcp@latest'], env: { APPLE_KEY_ID: config.appleKeyId || '', APPLE_ISSUER_ID: config.appleIssuerId || '', APPLE_P8_PATH: config.appleP8Path || '', APPLE_VENDOR_NUMBER: config.appleVendorNumber || '', GOOGLE_SERVICE_ACCOUNT_PATH: config.googleServiceAccountPath || '' } })

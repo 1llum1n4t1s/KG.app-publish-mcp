@@ -1,8 +1,8 @@
 **English** | [한국어](README.ko.md) | [中文](README.zh.md) | [日本語](README.ja.md)
 
-# app-publish-mcp
+# @kagayoi/app-publish-mcp
 
-[![npm version](https://img.shields.io/npm/v/app-publish-mcp)](https://www.npmjs.com/package/app-publish-mcp)
+[![npm version](https://img.shields.io/npm/v/%40kagayoi%2Fapp-publish-mcp)](https://www.npmjs.com/package/@kagayoi/app-publish-mcp)
 
 A unified [MCP (Model Context Protocol)](https://modelcontextprotocol.io) server for **App Store Connect** and **Google Play Console**. Manage app listings, screenshots, releases, reviews and submissions — all from your AI assistant.
 
@@ -84,12 +84,9 @@ Use this MCP when you need to:
 
 ## Setup
 
-### 1. Install
+### 1. Run from npm
 
-```bash
-npm install
-npm run build
-```
+No local clone or installation is required. The MCP client configuration below runs the latest npm release with `npx`.
 
 ### 2. Apple Credentials
 
@@ -127,8 +124,8 @@ Add to `~/.claude/settings.local.json`:
 {
   "mcpServers": {
     "app-publish-mcp": {
-      "command": "node",
-      "args": ["/path/to/app-publish-mcp/dist/index.js"],
+      "command": "npx",
+      "args": ["--yes", "@kagayoi/app-publish-mcp@latest"],
       "env": {
         "APPLE_KEY_ID": "YOUR_KEY_ID",
         "APPLE_ISSUER_ID": "YOUR_ISSUER_ID",

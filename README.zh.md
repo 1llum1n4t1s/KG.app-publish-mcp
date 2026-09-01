@@ -1,8 +1,8 @@
 [English](README.md) | [한국어](README.ko.md) | **中文** | [日本語](README.ja.md)
 
-# app-publish-mcp
+# @kagayoi/app-publish-mcp
 
-[![npm version](https://img.shields.io/npm/v/app-publish-mcp)](https://www.npmjs.com/package/app-publish-mcp)
+[![npm version](https://img.shields.io/npm/v/%40kagayoi%2Fapp-publish-mcp)](https://www.npmjs.com/package/@kagayoi/app-publish-mcp)
 
 统一的 [MCP（模型上下文协议）](https://modelcontextprotocol.io)服务器，支持 **App Store Connect** 和 **Google Play Console**。从 AI 助手管理应用列表、截图、发布、评论和提交。
 
@@ -66,12 +66,9 @@
 
 ## 配置
 
-### 1. 安装
+### 1. 从 npm 运行
 
-```bash
-npm install
-npm run build
-```
+无需本地克隆或预先安装。以下 MCP 客户端配置会通过 `npx` 运行 npm 上的最新版本。
 
 ### 2. Apple 凭证
 
@@ -109,8 +106,8 @@ GOOGLE_SERVICE_ACCOUNT_PATH=/path/to/service-account.json
 {
   "mcpServers": {
     "app-publish-mcp": {
-      "command": "node",
-      "args": ["/path/to/app-publish-mcp/dist/index.js"],
+      "command": "npx",
+      "args": ["--yes", "@kagayoi/app-publish-mcp@latest"],
       "env": {
         "APPLE_KEY_ID": "YOUR_KEY_ID",
         "APPLE_ISSUER_ID": "YOUR_ISSUER_ID",

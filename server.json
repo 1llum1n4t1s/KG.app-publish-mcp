@@ -1,17 +1,17 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.mikusnuz/app-publish",
+  "name": "io.github.1llum1n4t1s/app-publish",
   "description": "MCP server for App Store Connect & Google Play Console — iOS/Android app management",
   "repository": {
-    "url": "https://github.com/mikusnuz/app-publish-mcp",
+    "url": "https://github.com/1llum1n4t1s/KG.app-publish-mcp",
     "source": "github"
   },
-  "version": "1.0.1",
+  "version": "1.0.2",
   "packages": [
     {
       "registryType": "npm",
-      "identifier": "app-publish-mcp",
-      "version": "1.0.1",
+      "identifier": "@kagayoi/app-publish-mcp",
+      "version": "1.0.2",
       "transport": {
         "type": "stdio"
       },

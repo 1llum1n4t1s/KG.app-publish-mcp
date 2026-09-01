@@ -1,8 +1,8 @@
 [English](README.md) | [한국어](README.ko.md) | [中文](README.zh.md) | **日本語**
 
-# app-publish-mcp
+# @kagayoi/app-publish-mcp
 
-[![npm version](https://img.shields.io/npm/v/app-publish-mcp)](https://www.npmjs.com/package/app-publish-mcp)
+[![npm version](https://img.shields.io/npm/v/%40kagayoi%2Fapp-publish-mcp)](https://www.npmjs.com/package/@kagayoi/app-publish-mcp)
 
 **App Store Connect**と**Google Play Console**のための統合[MCP (Model Context Protocol)](https://modelcontextprotocol.io)サーバー。アプリのリスティング、スクリーンショット、リリース、レビュー、申請をAIアシスタントから管理できます。
 
@@ -66,12 +66,9 @@
 
 ## セットアップ
 
-### 1. インストール
+### 1. npm から実行
 
-```bash
-npm install
-npm run build
-```
+ローカル clone や事前インストールは不要です。以下の MCP クライアント設定から `npx` で npm の最新版を実行できます。
 
 ### 2. Apple認証情報
 
@@ -109,8 +106,8 @@ GOOGLE_SERVICE_ACCOUNT_PATH=/path/to/service-account.json
 {
   "mcpServers": {
     "app-publish-mcp": {
-      "command": "node",
-      "args": ["/path/to/app-publish-mcp/dist/index.js"],
+      "command": "npx",
+      "args": ["--yes", "@kagayoi/app-publish-mcp@latest"],
       "env": {
         "APPLE_KEY_ID": "YOUR_KEY_ID",
         "APPLE_ISSUER_ID": "YOUR_ISSUER_ID",
