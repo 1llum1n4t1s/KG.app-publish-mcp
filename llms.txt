@@ -21,9 +21,9 @@
 }
 ```
 
-## Tools (115 total)
+## Tools (118 total)
 
-### Apple App Store Connect (70)
+### Apple App Store Connect (71)
 - apple_list_apps — List all apps in App Store Connect
 - apple_get_app — Get app details by ID
 - apple_get_app_info — Get app info (categories, age rating)
@@ -95,16 +95,18 @@
 - apple_list_win_back_offers — List win-back offers for a subscription
 - apple_get_win_back_offer — Get a win-back offer
 
-### Google Play Console (45)
+### Google Play Console (47)
 - google_create_edit — Start a new edit session
 - google_commit_edit — Commit (publish) an edit
 - google_validate_edit — Validate an edit before committing
 - google_delete_edit — Discard an edit
+- google_enroll_app_signing — Enroll an app in Play App Signing with a self-hosted Cloud KMS key
+- google_rotate_app_signing_key — Rotate an app's self-hosted Cloud KMS signing key
 - google_get_details — Get app details
 - google_update_details — Update app details (contact info, etc.)
 - google_list_listings — List store listings (all locales)
 - google_get_listing — Get a store listing for a locale
-- google_update_listing — Update a store listing
+- google_update_listing — Partially update a store listing while preserving omitted fields
 - google_delete_listing — Delete a store listing
 - google_get_country_availability — Get country availability for a track
 - google_get_testers — Get testers for a track
@@ -115,7 +117,7 @@
 - google_delete_all_images — Delete all images of a type
 - google_list_tracks — List all release tracks
 - google_get_track — Get track details (releases, status)
-- google_create_release — Create a release on a track
+- google_create_release — Create or update a track release without discarding other active releases (versionCodes required; defaults to draft)
 - google_promote_release — Promote a release to another track
 - google_halt_release — Halt a staged rollout
 - google_upload_bundle — Upload an AAB bundle
@@ -125,8 +127,8 @@
 - google_reply_to_review — Reply to a user review
 - google_list_iap — List in-app products
 - google_get_iap — Get in-app product details
-- google_create_iap — Create an in-app product
-- google_update_iap — Update an in-app product
+- google_create_iap — Create a managed in-app product (subscriptions use google_create_subscription)
+- google_update_iap — Partially update an in-app product while preserving other listing locales
 - google_delete_iap — Delete an in-app product
 - google_list_subscriptions — List subscriptions
 - google_get_subscription — Get subscription details
@@ -136,7 +138,7 @@
 - google_deactivate_subscription_base_plan — Deactivate a subscription base plan
 - google_list_one_time_products — List one-time products (buy/rent)
 - google_get_one_time_product — Get a one-time product's details
-- google_create_one_time_product — Create a one-time product with purchase options
+- google_create_one_time_product — Create a new one-time product with purchase options; existing product IDs are rejected
 - google_update_one_time_product — Update a one-time product
 - google_delete_one_time_product — Delete a one-time product
 - google_activate_purchase_option — Activate a one-time product purchase option

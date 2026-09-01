@@ -8,7 +8,7 @@
 
 ## 機能
 
-### Apple App Store Connect (70ツール)
+### Apple App Store Connect (71ツール)
 | カテゴリ | ツール |
 |----------|-------|
 | アプリ管理 | `apple_list_apps`, `apple_get_app`, `apple_get_app_info`, `apple_update_category` |
@@ -36,10 +36,11 @@
 | オファーコード | `apple_list_subscription_offer_codes`, `apple_get_subscription_offer_code`, `apple_create_subscription_offer_code`, `apple_list_iap_offer_codes`, `apple_get_iap_offer_code`, `apple_create_iap_offer_code` |
 | ウィンバックオファー | `apple_list_win_back_offers`, `apple_get_win_back_offer` |
 
-### Google Play Console (45ツール)
+### Google Play Console (47ツール)
 | カテゴリ | ツール |
 |----------|-------|
 | 編集ライフサイクル | `google_create_edit`, `google_commit_edit`, `google_validate_edit`, `google_delete_edit` |
+| Play App Signing（自己管理KMS専用） | `google_enroll_app_signing`, `google_rotate_app_signing_key` |
 | アプリ詳細 | `google_get_details`, `google_update_details` |
 | ストアリスティング | `google_list_listings`, `google_get_listing`, `google_update_listing`, `google_delete_listing` |
 | 国別利用可否 | `google_get_country_availability` |
@@ -141,7 +142,7 @@ GOOGLE_SERVICE_ACCOUNT_PATH=/path/to/service-account.json
 2. google_update_details → 連絡先情報を更新
 3. google_update_listing → ストアリスティングを更新
 4. google_upload_bundle → .aabファイルをアップロード
-5. google_create_release → 本番トラックでリリースを作成
+5. google_create_release → 本番トラックにドラフトを作成（versionCodes必須。配信時はstatusを明示）
 6. google_validate_edit → エラーチェック
 7. google_commit_edit → 変更を公開
 ```

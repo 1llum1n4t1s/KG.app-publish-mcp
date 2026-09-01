@@ -2,16 +2,25 @@ import { google, androidpublisher_v3 } from 'googleapis';
 import { GoogleAuth, OAuth2Client } from 'google-auth-library';
 import { readFileSync } from 'fs';
 import { extname } from 'path';
+import { getGoogleApiStatus } from './errors.js';
 
-/** Play Console accepts PNG and JPEG store assets; pick by extension, fall back to PNG. */
-function imageMimeType(imagePath: string): string {
-  switch (extname(imagePath).toLowerCase()) {
-    case '.jpg':
-    case '.jpeg':
-      return 'image/jpeg';
-    default:
-      return 'image/png';
+/** Validate the store asset's extension and signature before selecting its MIME type. */
+function imageMimeType(imagePath: string, bytes: Buffer): string {
+  const extension = extname(imagePath).toLowerCase();
+  if (extension === '.png') {
+    const pngSignature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    if (bytes.length < pngSignature.length || !bytes.subarray(0, pngSignature.length).equals(pngSignature)) {
+      throw new Error(`Image content does not match the .png extension: ${imagePath}`);
+    }
+    return 'image/png';
   }
+  if (extension === '.jpg' || extension === '.jpeg') {
+    if (bytes.length < 3 || bytes[0] !== 0xff || bytes[1] !== 0xd8 || bytes[2] !== 0xff) {
+      throw new Error(`Image content does not match the ${extension} extension: ${imagePath}`);
+    }
+    return 'image/jpeg';
+  }
+  throw new Error(`Unsupported image extension "${extension || '(none)'}". Use a PNG or JPEG file.`);
 }
 
 export interface GoogleClientOptions {
@@ -19,6 +28,38 @@ export interface GoogleClientOptions {
   clientId?: string;
   clientSecret?: string;
   refreshToken?: string;
+}
+
+export type GoogleKeyRotationReason =
+  | 'COMPROMISED_KEY'
+  | 'USE_STRONGER_KEY'
+  | 'USE_SAME_KEY_FOR_MULTIPLE_APPS'
+  | 'ROUTINE_KEY_UPGRADE'
+  | 'OTHER';
+
+export type GoogleAppSigningEnrollment =
+  | {
+      enrollmentType: 'new';
+      cloudKmsKeyVersionResource: string;
+      pemCertificatePath: string;
+      pemUploadCertificatePath?: string;
+    }
+  | {
+      enrollmentType: 'existing';
+      cloudKmsKeyVersionResource: string;
+      pemUploadCertificatePath?: string;
+    };
+
+function readPemCertificateAsBase64(certificatePath: string): string {
+  const pem = readFileSync(certificatePath, 'utf8');
+  if (!pem.includes('-----BEGIN CERTIFICATE-----') || !pem.includes('-----END CERTIFICATE-----')) {
+    throw new Error(`Certificate file is not PEM encoded: ${certificatePath}`);
+  }
+  return Buffer.from(pem, 'utf8').toString('base64');
+}
+
+function readFileAsBase64(filePath: string): string {
+  return readFileSync(filePath).toString('base64');
 }
 
 export class GoogleClient {
@@ -48,6 +89,62 @@ export class GoogleClient {
 
   get api() {
     return this.publisher;
+  }
+
+  // ─── Play App Signing (self-hosted Cloud KMS) ───
+  async enrollAppSigning(name: string, enrollment: GoogleAppSigningEnrollment) {
+    const requestBody: androidpublisher_v3.Schema$EnrollAppRequest = {
+      pemUploadCertificate: enrollment.pemUploadCertificatePath
+        ? readPemCertificateAsBase64(enrollment.pemUploadCertificatePath)
+        : undefined,
+    };
+
+    if (enrollment.enrollmentType === 'new') {
+      requestBody.enrollNewApp = {
+        cloudKmsKeyAndCert: {
+          cloudKmsKey: {
+            cryptoKeyVersionResource: enrollment.cloudKmsKeyVersionResource,
+          },
+          pemCertificate: readPemCertificateAsBase64(enrollment.pemCertificatePath),
+        },
+      };
+    } else {
+      requestBody.enrollExistingApp = {
+        cloudKmsKey: {
+          cryptoKeyVersionResource: enrollment.cloudKmsKeyVersionResource,
+        },
+      };
+    }
+
+    const res = await this.publisher.appsigning.enrollApp({ name, requestBody });
+    return res.data;
+  }
+
+  async rotateAppSigningKey(
+    name: string,
+    opts: {
+      cloudKmsKeyVersionResource: string;
+      pemCertificatePath: string;
+      signingCertificateLineagePath: string;
+      keyRotationReason: GoogleKeyRotationReason;
+    },
+  ) {
+    const res = await this.publisher.appsigning.rotateAppSigningKey({
+      name,
+      requestBody: {
+        keyRotationReason: opts.keyRotationReason,
+        rotatedCloudKmsKey: {
+          cloudKmsKeyAndCert: {
+            cloudKmsKey: {
+              cryptoKeyVersionResource: opts.cloudKmsKeyVersionResource,
+            },
+            pemCertificate: readPemCertificateAsBase64(opts.pemCertificatePath),
+          },
+          signingCertificateLineage: readFileAsBase64(opts.signingCertificateLineagePath),
+        },
+      },
+    });
+    return res.data;
   }
 
   // ─── Edit lifecycle ───
@@ -102,7 +199,7 @@ export class GoogleClient {
     language: string,
     listing: { title?: string; shortDescription?: string; fullDescription?: string; video?: string },
   ) {
-    const res = await this.publisher.edits.listings.update({
+    const res = await this.publisher.edits.listings.patch({
       packageName, editId, language,
       requestBody: listing,
     });
@@ -159,7 +256,8 @@ export class GoogleClient {
     imageType: string,
     imagePath: string,
   ) {
-    const media = { mimeType: imageMimeType(imagePath), body: readFileSync(imagePath) };
+    const body = readFileSync(imagePath);
+    const media = { mimeType: imageMimeType(imagePath, body), body };
     const res = await this.publisher.edits.images.upload({
       packageName, editId, language, imageType,
       media,
@@ -257,8 +355,22 @@ export class GoogleClient {
 
   // ─── In-App Products ───
   async listInAppProducts(packageName: string) {
-    const res = await this.publisher.inappproducts.list({ packageName });
-    return res.data.inappproduct ?? [];
+    const products: androidpublisher_v3.Schema$InAppProduct[] = [];
+    const seenTokens = new Set<string>();
+    let token: string | undefined;
+
+    do {
+      const res = await this.publisher.inappproducts.list({ packageName, token });
+      products.push(...(res.data.inappproduct ?? []));
+      const nextToken = res.data.tokenPagination?.nextPageToken ?? undefined;
+      if (nextToken && seenTokens.has(nextToken)) {
+        throw new Error(`Google Play returned a repeated in-app product page token: ${nextToken}`);
+      }
+      if (nextToken) seenTokens.add(nextToken);
+      token = nextToken;
+    } while (token);
+
+    return products;
   }
 
   async getInAppProduct(packageName: string, sku: string) {
@@ -269,6 +381,7 @@ export class GoogleClient {
   async createInAppProduct(packageName: string, product: androidpublisher_v3.Schema$InAppProduct) {
     const res = await this.publisher.inappproducts.insert({
       packageName,
+      autoConvertMissingPrices: true,
       requestBody: product,
     });
     return res.data;
@@ -277,6 +390,7 @@ export class GoogleClient {
   async updateInAppProduct(packageName: string, sku: string, product: androidpublisher_v3.Schema$InAppProduct) {
     const res = await this.publisher.inappproducts.patch({
       packageName, sku,
+      autoConvertMissingPrices: product.defaultPrice != null,
       requestBody: product,
     });
     return res.data;
@@ -288,8 +402,26 @@ export class GoogleClient {
 
   // ─── Subscriptions (monetization) ───
   async listSubscriptions(packageName: string) {
-    const res = await this.publisher.monetization.subscriptions.list({ packageName });
-    return res.data.subscriptions ?? [];
+    const subscriptions: androidpublisher_v3.Schema$Subscription[] = [];
+    const seenTokens = new Set<string>();
+    let pageToken: string | undefined;
+
+    do {
+      const res = await this.publisher.monetization.subscriptions.list({
+        packageName,
+        pageSize: 1000,
+        pageToken,
+      });
+      subscriptions.push(...(res.data.subscriptions ?? []));
+      const nextToken = res.data.nextPageToken ?? undefined;
+      if (nextToken && seenTokens.has(nextToken)) {
+        throw new Error(`Google Play returned a repeated subscription page token: ${nextToken}`);
+      }
+      if (nextToken) seenTokens.add(nextToken);
+      pageToken = nextToken;
+    } while (pageToken);
+
+    return subscriptions;
   }
 
   async getSubscription(packageName: string, productId: string) {
@@ -365,16 +497,56 @@ export class GoogleClient {
 
   // ─── One-time Products (monetization) ───
   async listOneTimeProducts(packageName: string) {
-    const res = await this.publisher.monetization.onetimeproducts.list({ packageName });
+    const oneTimeProducts: androidpublisher_v3.Schema$OneTimeProduct[] = [];
+    const seenTokens = new Set<string>();
+    let pageToken: string | undefined;
+
+    do {
+      const res = await this.publisher.monetization.onetimeproducts.list({
+        packageName,
+        pageSize: 1000,
+        pageToken,
+      });
+      oneTimeProducts.push(...(res.data.oneTimeProducts ?? []));
+      const nextToken = res.data.nextPageToken ?? undefined;
+      if (nextToken && seenTokens.has(nextToken)) {
+        throw new Error(`Google Play returned a repeated one-time product page token: ${nextToken}`);
+      }
+      if (nextToken) seenTokens.add(nextToken);
+      pageToken = nextToken;
+    } while (pageToken);
+
     return {
-      oneTimeProducts: res.data.oneTimeProducts ?? [],
-      nextPageToken: res.data.nextPageToken ?? null,
+      oneTimeProducts,
+      nextPageToken: null,
     };
   }
 
   async getOneTimeProduct(packageName: string, productId: string) {
     const res = await this.publisher.monetization.onetimeproducts.get({ packageName, productId });
     return res.data;
+  }
+
+  async createOneTimeProduct(
+    packageName: string,
+    productId: string,
+    product: androidpublisher_v3.Schema$OneTimeProduct,
+    regionsVersionVersion: string,
+  ) {
+    try {
+      await this.getOneTimeProduct(packageName, productId);
+      throw new Error(
+        `One-time product "${productId}" already exists. Use google_update_one_time_product to modify it.`,
+      );
+    } catch (err: unknown) {
+      if (getGoogleApiStatus(err) !== 404) throw err;
+    }
+
+    return this.upsertOneTimeProduct(packageName, productId, product, {
+      allowMissing: true,
+      updateMask: '*',
+      regionsVersionVersion,
+    });
   }
 
   async upsertOneTimeProduct(

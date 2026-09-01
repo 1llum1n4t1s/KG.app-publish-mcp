@@ -22,7 +22,7 @@ Use this MCP when you need to:
 
 ## Features
 
-### Apple App Store Connect (70 tools)
+### Apple App Store Connect (71 tools)
 | Category | Tools |
 |----------|-------|
 | App Management | `apple_list_apps`, `apple_get_app`, `apple_get_app_info`, `apple_update_category` |
@@ -50,10 +50,11 @@ Use this MCP when you need to:
 | Offer Codes | `apple_list_subscription_offer_codes`, `apple_get_subscription_offer_code`, `apple_create_subscription_offer_code`, `apple_list_iap_offer_codes`, `apple_get_iap_offer_code`, `apple_create_iap_offer_code` |
 | Win-Back Offers | `apple_list_win_back_offers`, `apple_get_win_back_offer` |
 
-### Google Play Console (45 tools)
+### Google Play Console (47 tools)
 | Category | Tools |
 |----------|-------|
 | Edit Lifecycle | `google_create_edit`, `google_commit_edit`, `google_validate_edit`, `google_delete_edit` |
+| Play App Signing³ | `google_enroll_app_signing`, `google_rotate_app_signing_key` |
 | App Details | `google_get_details`, `google_update_details` |
 | Store Listing | `google_list_listings`, `google_get_listing`, `google_update_listing`, `google_delete_listing` |
 | Country Availability | `google_get_country_availability` |
@@ -68,7 +69,9 @@ Use this MCP when you need to:
 
 ¹ If `google_list_reviews` returns an empty array for an app that has visible reviews in Play Console, first check that the linked service account has the **"Reply to reviews"** account permission (Play Console → Users and permissions) — the API does not raise a distinct error for a missing permission, it just returns no results. Also note the endpoint only surfaces recent reviews; use `pageToken` to page through more.
 
-² One-time Products (`monetization.onetimeproducts`) is Google Play's newer purchase model for buy/rent items, distinct from the older `inappproducts` API. Purchase options are created active by default; use `google_deactivate_purchase_option` to pull one down without deleting the product.
+² One-time Products (`monetization.onetimeproducts`) is Google Play's newer purchase model for buy/rent items, distinct from the older `inappproducts` API. `google_create_one_time_product` rejects existing product IDs; use `google_update_one_time_product` for updates. Purchase options are created active by default; use `google_deactivate_purchase_option` to pull one down without deleting the product.
+
+³ Play App Signing tools only support enterprise apps using self-hosted Google Cloud KMS keys. Standard Google-managed signing enrollment and rotation remain Play Console operations.
 
 ### Prompts (2)
 | Prompt | Description |
@@ -146,7 +149,7 @@ Add the server and its credential environment variables to
 2. google_update_details → update contact info
 3. google_update_listing → update store listing
 4. google_upload_bundle → upload .aab file
-5. google_create_release → create release on production track
+5. google_create_release → create a draft release on the production track (versionCodes required; set status explicitly to roll out)
 6. google_validate_edit → check for errors
 7. google_commit_edit → publish changes
 ```

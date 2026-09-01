@@ -8,7 +8,7 @@
 
 ## 기능
 
-### Apple App Store Connect (70개 도구)
+### Apple App Store Connect (71개 도구)
 | 카테고리 | 도구 |
 |----------|-------|
 | 앱 관리 | `apple_list_apps`, `apple_get_app`, `apple_get_app_info`, `apple_update_category` |
@@ -36,10 +36,11 @@
 | 오퍼 코드 | `apple_list_subscription_offer_codes`, `apple_get_subscription_offer_code`, `apple_create_subscription_offer_code`, `apple_list_iap_offer_codes`, `apple_get_iap_offer_code`, `apple_create_iap_offer_code` |
 | 윈백 오퍼 | `apple_list_win_back_offers`, `apple_get_win_back_offer` |
 
-### Google Play Console (45개 도구)
+### Google Play Console (47개 도구)
 | 카테고리 | 도구 |
 |----------|-------|
 | 편집 생명주기 | `google_create_edit`, `google_commit_edit`, `google_validate_edit`, `google_delete_edit` |
+| Play 앱 서명(자체 호스팅 KMS 전용) | `google_enroll_app_signing`, `google_rotate_app_signing_key` |
 | 앱 상세 정보 | `google_get_details`, `google_update_details` |
 | 스토어 리스팅 | `google_list_listings`, `google_get_listing`, `google_update_listing`, `google_delete_listing` |
 | 국가 가용성 | `google_get_country_availability` |
@@ -141,7 +142,7 @@ GOOGLE_SERVICE_ACCOUNT_PATH=/path/to/service-account.json
 2. google_update_details → 연락처 정보 업데이트
 3. google_update_listing → 스토어 리스팅 업데이트
 4. google_upload_bundle → .aab 파일 업로드
-5. google_create_release → production 트랙에 릴리스 생성
+5. google_create_release → production 트랙에 초안 릴리스 생성 (versionCodes 필수, 출시 시 status 명시)
 6. google_validate_edit → 오류 확인
 7. google_commit_edit → 변경사항 게시
 ```

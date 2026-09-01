@@ -12,12 +12,16 @@
 import { OAuth2Client } from 'google-auth-library';
 import { createServer } from 'http';
 import { execFile } from 'child_process';
+import { randomBytes } from 'crypto';
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 
 const CONFIG_DIR = join(homedir(), '.app-publish-mcp');
 const GOOGLE_TOKEN_PATH = join(CONFIG_DIR, 'google.json');
+const GOOGLE_OAUTH_CALLBACK_HOST = '127.0.0.1';
+const GOOGLE_OAUTH_CALLBACK_PORT = 19847;
+const GOOGLE_OAUTH_CALLBACK_ORIGIN = `http://${GOOGLE_OAUTH_CALLBACK_HOST}:${GOOGLE_OAUTH_CALLBACK_PORT}`;
 
 // Embedded OAuth client — registered as "Desktop app" type so no client secret leak risk
 const EMBEDDED_CLIENT_ID = ''; // will be set by user or embedded
@@ -34,10 +38,33 @@ export function getGoogleTokenPath(): string {
   return GOOGLE_TOKEN_PATH;
 }
 
+export function parseSavedGoogleToken(raw: string): TokenStore | null {
+  try {
+    const candidate: unknown = JSON.parse(raw);
+    if (!candidate || typeof candidate !== 'object') return null;
+    const token = candidate as Record<string, unknown>;
+    if (
+      typeof token.clientId !== 'string' || token.clientId.trim() === '' ||
+      typeof token.clientSecret !== 'string' || token.clientSecret.trim() === '' ||
+      typeof token.refreshToken !== 'string' || token.refreshToken.trim() === ''
+    ) {
+      return null;
+    }
+    return {
+      clientId: token.clientId,
+      clientSecret: token.clientSecret,
+      refreshToken: token.refreshToken,
+      savedAt: typeof token.savedAt === 'string' ? token.savedAt : '',
+    };
+  } catch {
+    return null;
+  }
+}
+
 export function loadSavedGoogleToken(): TokenStore | null {
   if (!existsSync(GOOGLE_TOKEN_PATH)) return null;
   try {
-    return JSON.parse(readFileSync(GOOGLE_TOKEN_PATH, 'utf-8'));
+    return parseSavedGoogleToken(readFileSync(GOOGLE_TOKEN_PATH, 'utf-8'));
   } catch {
     return null;
   }
@@ -58,35 +85,61 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;');
 }
 
-/** Open a URL in the user's default browser without passing it through a shell. */
-function openBrowser(url: string): void {
-  if (process.platform === 'darwin') {
-    execFile('open', [url]);
-  } else if (process.platform === 'win32') {
-    // cmd's `start` treats the first quoted argument as the window title,
-    // so the empty title placeholder is required before the URL.
-    execFile('cmd', ['/c', 'start', '', url]);
-  } else {
-    execFile('xdg-open', [url]);
+export function getBrowserOpenCommand(
+  url: string,
+  platform: NodeJS.Platform = process.platform,
+): { file: string; args: string[] } {
+  if (platform === 'darwin') return { file: 'open', args: [url] };
+  if (platform === 'win32') {
+    return { file: 'rundll32.exe', args: ['url.dll,FileProtocolHandler', url] };
   }
+  return { file: 'xdg-open', args: [url] };
 }
 
-async function authGoogle(clientId: string, clientSecret: string): Promise<void> {
-  const oauth2 = new OAuth2Client(clientId, clientSecret, 'http://localhost:19847/callback');
-
-  const authUrl = oauth2.generateAuthUrl({
-    access_type: 'offline',
-    scope: SCOPES,
-    prompt: 'consent',
+/** Open a URL in the user's default browser without passing it through a shell. */
+function openBrowser(url: string): void {
+  const command = getBrowserOpenCommand(url);
+  const child = execFile(command.file, command.args);
+  child.once('error', err => {
+    console.error(`Could not open the browser automatically: ${err.message}`);
   });
+}
 
-  // Start local callback server
-  const code = await new Promise<string>((resolve, reject) => {
-    const server = createServer(async (req, res) => {
-      const url = new URL(req.url!, `http://localhost:19847`);
+export interface OAuthCallbackOptions {
+  host?: string;
+  port?: number;
+  timeoutMs?: number;
+  openBrowser?: (url: string) => void;
+  log?: (message: string) => void;
+  onListening?: (address: { host: string; port: number }) => void;
+}
+
+export function waitForOAuthCode(
+  authUrl: string,
+  expectedState: string,
+  options: OAuthCallbackOptions = {},
+): Promise<string> {
+  const host = options.host ?? GOOGLE_OAUTH_CALLBACK_HOST;
+  const port = options.port ?? GOOGLE_OAUTH_CALLBACK_PORT;
+  const timeoutMs = options.timeoutMs ?? 120_000;
+  const launchBrowser = options.openBrowser ?? openBrowser;
+  const log = options.log ?? console.log;
+
+  return new Promise<string>((resolve, reject) => {
+    let settled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const server = createServer((req, res) => {
+      const url = new URL(req.url ?? '/', `http://${host}:${port}`);
       if (url.pathname !== '/callback') {
         res.writeHead(404);
         res.end();
+        return;
+      }
+
+      if (url.searchParams.get('state') !== expectedState) {
+        res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('Invalid OAuth state');
         return;
       }
 
@@ -96,8 +149,7 @@ async function authGoogle(clientId: string, clientSecret: string): Promise<void>
       if (error) {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         res.end(`<h1>Authentication failed</h1><p>${escapeHtml(error)}</p><p>You can close this tab.</p>`);
-        server.close();
-        reject(new Error(`Auth failed: ${error}`));
+        finish(new Error(`Auth failed: ${error}`));
         return;
       }
 
@@ -117,23 +169,55 @@ async function authGoogle(clientId: string, clientSecret: string): Promise<void>
           </div>
         </body></html>
       `);
-      server.close();
-      resolve(code);
+      finish(undefined, code);
     });
 
-    server.listen(19847, () => {
-      console.log('\n🔐 Opening browser for Google authentication...\n');
-      console.log(`If the browser doesn't open, visit:\n${authUrl}\n`);
+    const finish = (error?: Error, code?: string): void => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      if (server.listening) server.close();
+      if (error) reject(error);
+      else resolve(code!);
+    };
 
-      openBrowser(authUrl);
+    server.once('error', err => {
+      finish(new Error(`OAuth callback server failed: ${err.message}`, { cause: err }));
     });
 
-    // Timeout after 2 minutes
-    setTimeout(() => {
-      server.close();
-      reject(new Error('Authentication timed out (2 min)'));
-    }, 120_000);
+    timer = setTimeout(() => {
+      finish(new Error(`Authentication timed out (${Math.ceil(timeoutMs / 60_000)} min)`));
+    }, timeoutMs);
+
+    server.listen(port, host, () => {
+      const address = server.address();
+      const listeningPort = typeof address === 'object' && address ? address.port : port;
+      options.onListening?.({ host, port: listeningPort });
+
+      log('\n🔐 Opening browser for Google authentication...\n');
+      log(`If the browser doesn't open, visit:\n${authUrl}\n`);
+
+      try {
+        launchBrowser(authUrl);
+      } catch (err) {
+        finish(err instanceof Error ? err : new Error(String(err)));
+      }
+    });
   });
+}
+
+async function authGoogle(clientId: string, clientSecret: string): Promise<void> {
+  const oauth2 = new OAuth2Client(clientId, clientSecret, `${GOOGLE_OAUTH_CALLBACK_ORIGIN}/callback`);
+  const state = randomBytes(32).toString('base64url');
+
+  const authUrl = oauth2.generateAuthUrl({
+    access_type: 'offline',
+    scope: SCOPES,
+    prompt: 'consent',
+    state,
+  });
+
+  const code = await waitForOAuthCode(authUrl, state);
 
   // Exchange code for tokens
   const { tokens } = await oauth2.getToken(code);

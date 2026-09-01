@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { createHash } from 'crypto';
 import { readFileSync } from 'fs';
-import { AppleClient } from './client.js';
+import { AppleApiError, AppleClient } from './client.js';
 
 // Helper to define a tool
 interface ToolDef {
@@ -345,32 +345,51 @@ const uploadScreenshot: ToolDef = {
       },
     });
 
-    // Step 2: Upload binary to each upload operation URL.
-    // Apple returns pre-signed S3 operations with their own requestHeaders —
-    // honor them exactly; don't inject a Bearer token or Content-Type.
     const screenshot = reservation.data;
-    const operations = screenshot.attributes.uploadOperations;
+    const screenshotId = screenshot?.id;
+    if (!screenshotId) throw new Error('Apple did not return an ID for the screenshot reservation');
 
-    for (const op of operations) {
-      await client.uploadOperation(op, args.filePath);
-    }
+    try {
+      // Step 2: Upload binary to each upload operation URL.
+      // Apple returns pre-signed operations with their own requestHeaders —
+      // honor them exactly; don't inject a Bearer token or Content-Type.
+      const operations = screenshot.attributes?.uploadOperations;
+      if (!Array.isArray(operations) || operations.length === 0) {
+        throw new Error('Apple did not return upload operations for the screenshot reservation');
+      }
 
-    // Step 3: Commit
-    await client.request(`/appScreenshots/${screenshot.id}`, {
-      method: 'PATCH',
-      body: {
-        data: {
-          type: 'appScreenshots',
-          id: screenshot.id,
-          attributes: {
-            uploaded: true,
-            sourceFileChecksum,
+      for (const op of operations) {
+        await client.uploadOperation(op, args.filePath);
+      }
+
+      // Step 3: Commit
+      await client.request(`/appScreenshots/${screenshotId}`, {
+        method: 'PATCH',
+        body: {
+          data: {
+            type: 'appScreenshots',
+            id: screenshotId,
+            attributes: {
+              uploaded: true,
+              sourceFileChecksum,
+            },
           },
         },
-      },
-    });
+      });
+    } catch (err: unknown) {
+      let cleanupMessage = `Screenshot reservation ${screenshotId} was deleted.`;
+      try {
+        await client.request(`/appScreenshots/${screenshotId}`, { method: 'DELETE' });
+      } catch (cleanupError: unknown) {
+        cleanupMessage =
+          `Automatic deletion failed: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}. ` +
+          `Retry apple_delete_screenshot with screenshotId "${screenshotId}".`;
+      }
+      const message = err instanceof Error ? err.message : String(err);
+      throw new Error(`${message}\n\nScreenshot ID: ${screenshotId}. ${cleanupMessage}`, { cause: err });
+    }
 
-    return { success: true, screenshotId: screenshot.id };
+    return { success: true, screenshotId };
   },
 };
 
@@ -487,12 +506,14 @@ const updateReviewDetail: ToolDef = {
     notes: z.string().optional().describe('Notes for the reviewer'),
   }),
   handler: async (client, args) => {
-    // Get existing review detail
-    const existing = await client.request(
-      `/appStoreVersions/${args.versionId}/appStoreReviewDetail`,
-    );
+    let existing: any = null;
+    try {
+      existing = await client.request(`/appStoreVersions/${args.versionId}/appStoreReviewDetail`);
+    } catch (err: unknown) {
+      if (!(err instanceof AppleApiError) || err.status !== 404) throw err;
+    }
 
-    const reviewDetailId = existing.data?.id;
+    const reviewDetailId = existing?.data?.id;
     const { versionId, ...attributes } = args;
 
     if (reviewDetailId) {
@@ -555,7 +576,7 @@ const submitForReview: ToolDef = {
     });
     const submissionId = submission.data.id;
 
-    // Step 2: attach the version to the submission
+    // Steps 2-3 must either finish or clean up the submission created above.
     try {
       await client.request('/reviewSubmissionItems', {
         method: 'POST',
@@ -569,29 +590,49 @@ const submitForReview: ToolDef = {
           },
         },
       });
+
+      // Step 3: submit the review submission
+      return await client.request(`/reviewSubmissions/${submissionId}`, {
+        method: 'PATCH',
+        body: {
+          data: {
+            type: 'reviewSubmissions',
+            id: submissionId,
+            attributes: { submitted: true },
+          },
+        },
+      });
     } catch (err: any) {
       const message = err?.message ?? String(err);
-      if (message.includes('usesNonExemptEncryption')) {
-        throw new Error(
-          `${message}\n\nHint: the build is missing its export-compliance answer. Set it by calling ` +
-            `PATCH /v1/builds/<BUILD_ID> with { "data": { "type": "builds", "id": "<BUILD_ID>", "attributes": { "usesNonExemptEncryption": false } } } ` +
-            `(or set ITSAppUsesNonExemptEncryption in the app's Info.plist), then retry apple_submit_for_review.`,
-        );
-      }
-      throw err;
-    }
+      let cleanupResult = 'The incomplete review submission was automatically canceled.';
 
-    // Step 3: submit the review submission
-    return client.request(`/reviewSubmissions/${submissionId}`, {
-      method: 'PATCH',
-      body: {
-        data: {
-          type: 'reviewSubmissions',
-          id: submissionId,
-          attributes: { submitted: true },
-        },
-      },
-    });
+      try {
+        await client.request(`/reviewSubmissions/${submissionId}`, {
+          method: 'PATCH',
+          body: {
+            data: {
+              type: 'reviewSubmissions',
+              id: submissionId,
+              attributes: { canceled: true },
+            },
+          },
+        });
+      } catch (cleanupError: any) {
+        cleanupResult =
+          `Automatic cancellation failed: ${cleanupError?.message ?? String(cleanupError)}. ` +
+          `Retry apple_cancel_submission with submissionId "${submissionId}".`;
+      }
+
+      const exportComplianceHint = message.includes('usesNonExemptEncryption')
+        ? '\n\nHint: the build is missing its export-compliance answer. Set it in App Store Connect or set ' +
+          "ITSAppUsesNonExemptEncryption in the app's Info.plist, then retry apple_submit_for_review."
+        : '';
+
+      throw new Error(
+        `${message}${exportComplianceHint}\n\nReview submission ID: ${submissionId}. ${cleanupResult}`,
+        { cause: err },
+      );
+    }
   },
 };
 

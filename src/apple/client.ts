@@ -1,11 +1,27 @@
 import jwt from 'jsonwebtoken';
 import { readFileSync } from 'fs';
 
+const APPLE_API_TIMEOUT_MS = 60_000;
+const APPLE_UPLOAD_TIMEOUT_MS = 10 * 60_000;
+
 interface AppleConfig {
   keyId: string;
   issuerId: string;
   p8Path: string;
   vendorNumber?: string;
+}
+
+export class AppleApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly method: string,
+    readonly path: string,
+    readonly responseBody: string,
+  ) {
+    super(message);
+    this.name = 'AppleApiError';
+  }
 }
 
 export class AppleClient {
@@ -60,11 +76,18 @@ export class AppleClient {
         'Content-Type': 'application/json',
       },
       body: body ? JSON.stringify(body) : undefined,
+      signal: AbortSignal.timeout(APPLE_API_TIMEOUT_MS),
     });
 
     if (!res.ok) {
       const text = await res.text();
-      throw new Error(`Apple API ${method} ${path} → ${res.status}: ${text}`);
+      throw new AppleApiError(
+        `Apple API ${method} ${path} → ${res.status}: ${text}`,
+        res.status,
+        method,
+        path,
+        text,
+      );
     }
 
     if (res.status === 204) return {} as T;
@@ -80,6 +103,7 @@ export class AppleClient {
         'Content-Type': contentType,
       },
       body: data,
+      signal: AbortSignal.timeout(APPLE_UPLOAD_TIMEOUT_MS),
     });
 
     if (!res.ok) {
@@ -117,6 +141,7 @@ export class AppleClient {
       method: operation.method,
       headers,
       body: slice,
+      signal: AbortSignal.timeout(APPLE_UPLOAD_TIMEOUT_MS),
     });
 
     if (!res.ok) {

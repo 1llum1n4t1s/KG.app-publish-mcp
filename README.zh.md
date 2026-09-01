@@ -8,7 +8,7 @@
 
 ## 功能特性
 
-### Apple App Store Connect（70个工具）
+### Apple App Store Connect（71个工具）
 | 类别 | 工具 |
 |----------|-------|
 | 应用管理 | `apple_list_apps`, `apple_get_app`, `apple_get_app_info`, `apple_update_category` |
@@ -36,10 +36,11 @@
 | 优惠码 | `apple_list_subscription_offer_codes`, `apple_get_subscription_offer_code`, `apple_create_subscription_offer_code`, `apple_list_iap_offer_codes`, `apple_get_iap_offer_code`, `apple_create_iap_offer_code` |
 | 挽回优惠 | `apple_list_win_back_offers`, `apple_get_win_back_offer` |
 
-### Google Play Console（45个工具）
+### Google Play Console（47个工具）
 | 类别 | 工具 |
 |----------|-------|
 | 编辑生命周期 | `google_create_edit`, `google_commit_edit`, `google_validate_edit`, `google_delete_edit` |
+| Play 应用签名（仅限自托管 KMS） | `google_enroll_app_signing`, `google_rotate_app_signing_key` |
 | 应用详情 | `google_get_details`, `google_update_details` |
 | 商店列表 | `google_list_listings`, `google_get_listing`, `google_update_listing`, `google_delete_listing` |
 | 国家可用性 | `google_get_country_availability` |
@@ -141,7 +142,7 @@ GOOGLE_SERVICE_ACCOUNT_PATH=/path/to/service-account.json
 2. google_update_details → 更新联系信息
 3. google_update_listing → 更新商店列表
 4. google_upload_bundle → 上传 .aab 文件
-5. google_create_release → 在生产轨道上创建发布
+5. google_create_release → 在生产轨道上创建草稿发布（versionCodes 必填；发布时请明确指定 status）
 6. google_validate_edit → 检查错误
 7. google_commit_edit → 发布更改
 ```

@@ -9,6 +9,69 @@ interface ToolDef {
   handler: (client: GoogleClient, args: any) => Promise<any>;
 }
 
+const cloudKmsKeyVersionResource = z
+  .string()
+  .regex(
+    /^projects\/[^/]+\/locations\/[^/]+\/keyRings\/[^/]+\/cryptoKeys\/[^/]+\/cryptoKeyVersions\/[^/]+$/,
+    'Expected projects/{project}/locations/{location}/keyRings/{keyRing}/cryptoKeys/{key}/cryptoKeyVersions/{version}',
+  )
+  .describe('Full resource name of the self-hosted Google Cloud KMS key version');
+
+const confirmSelfHostedKms = z
+  .literal(true)
+  .describe('Must be true to confirm this app uses self-hosted Cloud KMS keys and that this signing operation is intentional');
+
+function normalizedVersionCodes(versionCodes: string[] | null | undefined): string[] {
+  return [...(versionCodes ?? [])].sort((a, b) => a.localeCompare(b, 'en', { numeric: true }));
+}
+
+function haveSameVersionCodes(
+  left: string[] | null | undefined,
+  right: string[] | null | undefined,
+): boolean {
+  return normalizedVersionCodes(left).join(',') === normalizedVersionCodes(right).join(',');
+}
+
+function upsertTrackRelease(
+  releases: androidpublisher_v3.Schema$TrackRelease[] | null | undefined,
+  release: androidpublisher_v3.Schema$TrackRelease,
+): androidpublisher_v3.Schema$TrackRelease[] {
+  const updated = [...(releases ?? [])];
+  const index = updated.findIndex(candidate => haveSameVersionCodes(candidate.versionCodes, release.versionCodes));
+  if (index >= 0) {
+    updated[index] = release;
+  } else {
+    updated.push(release);
+  }
+  return updated;
+}
+
+function maxVersionCode(release: androidpublisher_v3.Schema$TrackRelease): bigint {
+  return (release.versionCodes ?? []).reduce((maximum, versionCode) => {
+    if (!/^\d+$/.test(versionCode)) return maximum;
+    const value = BigInt(versionCode);
+    return value > maximum ? value : maximum;
+  }, -1n);
+}
+
+function selectPromotableRelease(
+  releases: androidpublisher_v3.Schema$TrackRelease[] | null | undefined,
+): androidpublisher_v3.Schema$TrackRelease | undefined {
+  return (releases ?? [])
+    .filter(release =>
+      (release.status === 'completed' || release.status === 'inProgress') &&
+      (release.versionCodes?.length ?? 0) > 0,
+    )
+    .reduce<androidpublisher_v3.Schema$TrackRelease | undefined>((latest, candidate) => {
+      if (!latest) return candidate;
+      const candidateVersion = maxVersionCode(candidate);
+      const latestVersion = maxVersionCode(latest);
+      if (candidateVersion !== latestVersion) return candidateVersion > latestVersion ? candidate : latest;
+      if (candidate.status === 'inProgress' && latest.status !== 'inProgress') return candidate;
+      return latest;
+    }, undefined);
+}
+
 // ═══════════════════════════════════════════
 // 1. Edit Lifecycle
 // ═══════════════════════════════════════════
@@ -65,7 +128,100 @@ const deleteEdit: ToolDef = {
 };
 
 // ═══════════════════════════════════════════
-// 2. App Details
+// 2. Play App Signing (self-hosted Cloud KMS)
+// ═══════════════════════════════════════════
+
+const enrollAppSigningSchema = z
+  .object({
+    packageName: z.string().min(1).describe('Android package name or Google Play app ID'),
+    enrollmentType: z
+      .enum(['new', 'existing'])
+      .describe('Use new only before the app has reached Open testing or Production; otherwise use existing'),
+    cloudKmsKeyVersionResource,
+    pemCertificatePath: z
+      .string()
+      .min(1)
+      .optional()
+      .describe('PEM certificate path for the self-hosted signing key; required for new app enrollment'),
+    pemUploadCertificatePath: z
+      .string()
+      .min(1)
+      .optional()
+      .describe('Optional PEM certificate path for a separate upload key'),
+    confirmSelfHostedKms,
+  })
+  .superRefine((args, ctx) => {
+    if (args.enrollmentType === 'new' && !args.pemCertificatePath) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['pemCertificatePath'],
+        message: 'pemCertificatePath is required for new app enrollment',
+      });
+    }
+    if (args.enrollmentType === 'existing' && args.pemCertificatePath) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['pemCertificatePath'],
+        message: 'pemCertificatePath is only valid for new app enrollment',
+      });
+    }
+  });
+
+const enrollAppSigning: ToolDef = {
+  name: 'google_enroll_app_signing',
+  description:
+    'Enroll an app in Play App Signing with a self-hosted Google Cloud KMS key. Enterprise-only advanced operation; standard Google-managed Play App Signing enrollment is not supported by the API.',
+  schema: enrollAppSigningSchema,
+  handler: async (client, args) => {
+    if (args.enrollmentType === 'new') {
+      return client.enrollAppSigning(args.packageName, {
+        enrollmentType: 'new',
+        cloudKmsKeyVersionResource: args.cloudKmsKeyVersionResource,
+        pemCertificatePath: args.pemCertificatePath,
+        pemUploadCertificatePath: args.pemUploadCertificatePath,
+      });
+    }
+    return client.enrollAppSigning(args.packageName, {
+      enrollmentType: 'existing',
+      cloudKmsKeyVersionResource: args.cloudKmsKeyVersionResource,
+      pemUploadCertificatePath: args.pemUploadCertificatePath,
+    });
+  },
+};
+
+const rotateAppSigningKey: ToolDef = {
+  name: 'google_rotate_app_signing_key',
+  description:
+    'Rotate an app signing key to another self-hosted Google Cloud KMS key. Only valid for apps already enrolled with self-hosted KMS; standard Google-managed signing key rotation remains a Play Console operation.',
+  schema: z.object({
+    packageName: z.string().min(1).describe('Android package name or Google Play app ID'),
+    cloudKmsKeyVersionResource,
+    pemCertificatePath: z.string().min(1).describe('PEM certificate path associated with the rotated Cloud KMS key'),
+    signingCertificateLineagePath: z
+      .string()
+      .min(1)
+      .describe('Path to the binary proof-of-rotation signing certificate lineage generated by apksigner'),
+    keyRotationReason: z.enum([
+      'COMPROMISED_KEY',
+      'USE_STRONGER_KEY',
+      'USE_SAME_KEY_FOR_MULTIPLE_APPS',
+      'ROUTINE_KEY_UPGRADE',
+      'OTHER',
+    ]),
+    confirmSelfHostedKms,
+  }),
+  handler: async (client, args) => {
+    return client.rotateAppSigningKey(args.packageName, {
+      cloudKmsKeyVersionResource: args.cloudKmsKeyVersionResource,
+      pemCertificatePath: args.pemCertificatePath,
+      signingCertificateLineagePath: args.signingCertificateLineagePath,
+      keyRotationReason: args.keyRotationReason,
+    });
+  },
+};
+
+// ═══════════════════════════════════════════
+// 3. App Details
 // ═══════════════════════════════════════════
 
 const getDetails: ToolDef = {
@@ -98,7 +254,7 @@ const updateDetails: ToolDef = {
 };
 
 // ═══════════════════════════════════════════
-// 3. Store Listing
+// 4. Store Listing
 // ═══════════════════════════════════════════
 
 const listListings: ToolDef = {
@@ -128,7 +284,7 @@ const getListing: ToolDef = {
 
 const updateListing: ToolDef = {
   name: 'google_update_listing',
-  description: 'Update store listing for a specific language (title, descriptions, promo video)',
+  description: 'Partially update a store listing for a specific language. Omitted fields are preserved.',
   schema: z.object({
     packageName: z.string().describe('Android package name'),
     editId: z.string().describe('Edit ID'),
@@ -159,7 +315,7 @@ const deleteListing: ToolDef = {
 };
 
 // ═══════════════════════════════════════════
-// 4. Country Availability & Testers
+// 5. Country Availability & Testers
 // ═══════════════════════════════════════════
 
 const getCountryAvailability: ToolDef = {
@@ -204,7 +360,7 @@ const updateTesters: ToolDef = {
 };
 
 // ═══════════════════════════════════════════
-// 5. Images (Screenshots, Icons, Feature Graphics)
+// 6. Images (Screenshots, Icons, Feature Graphics)
 // ═══════════════════════════════════════════
 
 const listImages: ToolDef = {
@@ -278,7 +434,7 @@ const deleteAllImages: ToolDef = {
 };
 
 // ═══════════════════════════════════════════
-// 6. Tracks & Releases
+// 7. Tracks & Releases
 // ═══════════════════════════════════════════
 
 const listTracks: ToolDef = {
@@ -309,38 +465,49 @@ const getTrack: ToolDef = {
 const createRelease: ToolDef = {
   name: 'google_create_release',
   description:
-    'Create a release on a track with optional version codes and release notes. This replaces the track\'s release list, so it refuses to run while a staged rollout of different version codes is in progress — halt or complete that rollout first.',
+    'Create or update a release on a track without discarding the track\'s other active releases. Defaults to draft; version codes are required.',
   schema: z.object({
     packageName: z.string().describe('Android package name'),
     editId: z.string().describe('Edit ID'),
     track: z.enum(['internal', 'alpha', 'beta', 'production']).describe('Target track'),
-    versionCodes: z.array(z.string()).optional().describe('Version codes to include'),
+    versionCodes: z.array(z.string().regex(/^[1-9]\d*$/, 'Version codes must be positive integer strings')).min(1).describe('Version codes to include'),
     releaseNotes: z.array(z.object({
       language: z.string(),
       text: z.string(),
     })).optional().describe('Release notes per language'),
-    status: z.enum(['draft', 'halted', 'completed', 'inProgress']).default('completed'),
-    userFraction: z.number().optional().describe('Staged rollout fraction (0.0-1.0, only for production)'),
+    status: z.enum(['draft', 'halted', 'completed', 'inProgress']).default('draft'),
+    userFraction: z.number().gt(0).lt(1).optional().describe('Staged rollout fraction (greater than 0 and less than 1, only for production)'),
     releaseName: z.string().optional().describe('Release name/label'),
+  }).superRefine((args, ctx) => {
+    const staged = args.status === 'inProgress' || args.status === 'halted';
+    if (staged && args.userFraction === undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['userFraction'],
+        message: `userFraction is required when status is ${args.status}`,
+      });
+    }
+    if (!staged && args.userFraction !== undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['userFraction'],
+        message: `userFraction cannot be set when status is ${args.status}`,
+      });
+    }
+    if (args.userFraction !== undefined && args.track !== 'production') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['track'],
+        message: 'Staged rollouts are only supported on the production track',
+      });
+    }
   }),
   handler: async (client, args) => {
-    const release: any = {
-      status: args.status,
-    };
-    if (args.versionCodes) release.versionCodes = args.versionCodes;
-    if (args.releaseNotes) release.releaseNotes = args.releaseNotes;
-    if (args.userFraction) release.userFraction = args.userFraction;
-    if (args.releaseName) release.name = args.releaseName;
-
-    // tracks.update is a PUT: the releases we send replace the track's list wholesale.
-    // Silently discarding an in-flight staged rollout would end it, so refuse unless
-    // this call is advancing that same rollout (identical version codes).
     const trackData = await client.getTrack(args.packageName, args.editId, args.track);
     const inProgress = trackData.releases?.find(r => r.status === 'inProgress');
     if (inProgress) {
-      const ongoing = [...(inProgress.versionCodes ?? [])].sort().join(',');
-      const incoming = [...(args.versionCodes ?? [])].sort().join(',');
-      if (ongoing !== incoming) {
+      const ongoing = normalizedVersionCodes(inProgress.versionCodes).join(',');
+      if (!haveSameVersionCodes(inProgress.versionCodes, args.versionCodes)) {
         throw new Error(
           `Track "${args.track}" has a staged rollout in progress (version codes ${ongoing || 'unknown'}` +
             `${inProgress.userFraction != null ? `, userFraction ${inProgress.userFraction}` : ''}). ` +
@@ -350,7 +517,22 @@ const createRelease: ToolDef = {
       }
     }
 
-    return client.updateTrack(args.packageName, args.editId, args.track, [release]);
+    const existing = trackData.releases?.find(candidate =>
+      haveSameVersionCodes(candidate.versionCodes, args.versionCodes),
+    );
+    const release: androidpublisher_v3.Schema$TrackRelease = {
+      ...existing,
+      versionCodes: args.versionCodes,
+      status: args.status,
+    };
+    if (args.releaseNotes) release.releaseNotes = args.releaseNotes;
+    if (args.userFraction !== undefined) release.userFraction = args.userFraction;
+    else delete release.userFraction;
+    if (args.releaseName) release.name = args.releaseName;
+    if (args.status !== 'inProgress') delete release.countryTargeting;
+
+    const releases = upsertTrackRelease(trackData.releases, release);
+    return client.updateTrack(args.packageName, args.editId, args.track, releases);
   },
 };
 
@@ -362,26 +544,48 @@ const promoteRelease: ToolDef = {
     editId: z.string().describe('Edit ID'),
     fromTrack: z.enum(['internal', 'alpha', 'beta']).describe('Source track'),
     toTrack: z.enum(['alpha', 'beta', 'production']).describe('Target track'),
-    userFraction: z.number().optional().describe('Staged rollout fraction for production'),
+    userFraction: z.number().gt(0).lt(1).optional().describe('Staged rollout fraction for production (greater than 0 and less than 1)'),
     releaseNotes: z.array(z.object({
       language: z.string(),
       text: z.string(),
     })).optional(),
   }),
   handler: async (client, args) => {
-    // Get the current release from source track
+    // Select the newest active source release without relying on API array order.
     const sourceTrack = await client.getTrack(args.packageName, args.editId, args.fromTrack);
-    const latestRelease = sourceTrack.releases?.[0];
-    if (!latestRelease) throw new Error(`No release found on ${args.fromTrack} track`);
+    const latestRelease = selectPromotableRelease(sourceTrack.releases);
+    if (!latestRelease) {
+      throw new Error(`No completed or in-progress release with version codes found on ${args.fromTrack} track`);
+    }
 
-    const release: any = {
+    const destinationTrack = await client.getTrack(args.packageName, args.editId, args.toTrack);
+    const destinationRollout = destinationTrack.releases?.find(candidate => candidate.status === 'inProgress');
+    if (destinationRollout && !haveSameVersionCodes(destinationRollout.versionCodes, latestRelease.versionCodes)) {
+      const ongoing = normalizedVersionCodes(destinationRollout.versionCodes).join(',');
+      const incoming = normalizedVersionCodes(latestRelease.versionCodes).join(',');
+      throw new Error(
+        `Track "${args.toTrack}" has a staged rollout in progress (version codes ${ongoing || 'unknown'}` +
+          `${destinationRollout.userFraction != null ? `, userFraction ${destinationRollout.userFraction}` : ''}). ` +
+          `Promoting version codes ${incoming || 'unknown'} would replace it. Halt or complete the existing rollout first.`,
+      );
+    }
+
+    const existingDestination = destinationTrack.releases?.find(candidate =>
+      haveSameVersionCodes(candidate.versionCodes, latestRelease.versionCodes),
+    );
+    const release: androidpublisher_v3.Schema$TrackRelease = {
+      ...existingDestination,
       versionCodes: latestRelease.versionCodes,
-      status: args.userFraction ? 'inProgress' : 'completed',
+      status: args.userFraction != null ? 'inProgress' : 'completed',
     };
-    if (args.userFraction) release.userFraction = args.userFraction;
+    if (args.userFraction != null) release.userFraction = args.userFraction;
+    else delete release.userFraction;
     if (args.releaseNotes) release.releaseNotes = args.releaseNotes;
+    else if (latestRelease.releaseNotes) release.releaseNotes = latestRelease.releaseNotes;
+    if (release.status !== 'inProgress') delete release.countryTargeting;
 
-    return client.updateTrack(args.packageName, args.editId, args.toTrack, [release]);
+    const releases = upsertTrackRelease(destinationTrack.releases, release);
+    return client.updateTrack(args.packageName, args.editId, args.toTrack, releases);
   },
 };
 
@@ -404,7 +608,7 @@ const haltRelease: ToolDef = {
 };
 
 // ═══════════════════════════════════════════
-// 7. Bundle / APK Upload
+// 8. Bundle / APK Upload
 // ═══════════════════════════════════════════
 
 const uploadBundle: ToolDef = {
@@ -434,7 +638,7 @@ const uploadApk: ToolDef = {
 };
 
 // ═══════════════════════════════════════════
-// 8. Reviews
+// 9. Reviews
 // ═══════════════════════════════════════════
 
 const listReviews: ToolDef = {
@@ -483,7 +687,7 @@ const replyToReview: ToolDef = {
 };
 
 // ═══════════════════════════════════════════
-// 9. In-App Products
+// 10. In-App Products
 // ═══════════════════════════════════════════
 
 const listInAppProducts: ToolDef = {
@@ -511,7 +715,7 @@ const getInAppProduct: ToolDef = {
 
 const createInAppProduct: ToolDef = {
   name: 'google_create_iap',
-  description: 'Create a new in-app product (managed product)',
+  description: 'Create a new managed in-app product. Use google_create_subscription for subscriptions.',
   schema: z.object({
     packageName: z.string().describe('Android package name'),
     sku: z.string().describe('Product SKU (unique identifier)'),
@@ -519,7 +723,7 @@ const createInAppProduct: ToolDef = {
     defaultTitle: z.string().describe('Default product title'),
     defaultDescription: z.string().describe('Default product description'),
     status: z.enum(['active', 'inactive']).default('active'),
-    purchaseType: z.enum(['managedUser', 'subscription']).default('managedUser'),
+    purchaseType: z.literal('managedUser').default('managedUser').describe('Legacy product type; subscriptions must use google_create_subscription'),
     defaultPriceCurrencyCode: z.string().describe('Currency code (e.g. USD)'),
     defaultPriceMicros: z.string().describe('Price in micros (e.g. 990000 for $0.99)'),
   }),
@@ -527,7 +731,7 @@ const createInAppProduct: ToolDef = {
     return client.createInAppProduct(args.packageName, {
       sku: args.sku,
       status: args.status,
-      purchaseType: args.purchaseType,
+      purchaseType: 'managedUser',
       defaultLanguage: args.defaultLanguage,
       listings: {
         [args.defaultLanguage]: {
@@ -545,7 +749,7 @@ const createInAppProduct: ToolDef = {
 
 const updateInAppProduct: ToolDef = {
   name: 'google_update_iap',
-  description: 'Update an existing in-app product',
+  description: 'Partially update an existing in-app product. Listing edits preserve other locales and omitted fields.',
   schema: z.object({
     packageName: z.string().describe('Android package name'),
     sku: z.string().describe('Product SKU'),
@@ -557,14 +761,24 @@ const updateInAppProduct: ToolDef = {
     defaultPriceMicros: z.string().optional().describe('Price in micros'),
   }),
   handler: async (client, args) => {
-    const product: any = {};
-    if (args.status) product.status = args.status;
-    if (args.defaultLanguage) product.defaultLanguage = args.defaultLanguage;
-    if (args.title || args.description) {
-      const lang = args.defaultLanguage || 'en-US';
-      product.listings = { [lang]: {} as any };
-      if (args.title) product.listings[lang].title = args.title;
-      if (args.description) product.listings[lang].description = args.description;
+    const product: androidpublisher_v3.Schema$InAppProduct = {};
+    if (args.status !== undefined) product.status = args.status;
+    if (args.defaultLanguage !== undefined) product.defaultLanguage = args.defaultLanguage;
+    if (args.title !== undefined || args.description !== undefined) {
+      const existing = await client.getInAppProduct(args.packageName, args.sku);
+      const language = args.defaultLanguage ?? existing.defaultLanguage;
+      if (!language) {
+        throw new Error('The existing product has no defaultLanguage; pass defaultLanguage when updating a listing');
+      }
+      const currentListings = existing.listings ?? {};
+      product.listings = {
+        ...currentListings,
+        [language]: {
+          ...(currentListings[language] ?? {}),
+          ...(args.title !== undefined ? { title: args.title } : {}),
+          ...(args.description !== undefined ? { description: args.description } : {}),
+        },
+      };
     }
     if (args.defaultPriceCurrencyCode && args.defaultPriceMicros) {
       product.defaultPrice = {
@@ -590,7 +804,7 @@ const deleteInAppProduct: ToolDef = {
 };
 
 // ═══════════════════════════════════════════
-// 10. Subscriptions (monetization)
+// 11. Subscriptions (monetization)
 // ═══════════════════════════════════════════
 
 const listSubscriptions: ToolDef = {
@@ -790,7 +1004,7 @@ const deactivateBasePlan: ToolDef = {
 };
 
 // ═══════════════════════════════════════════
-// 11. One-time Products (monetization)
+// 12. One-time Products (monetization)
 // ═══════════════════════════════════════════
 
 const listOneTimeProducts: ToolDef = {
@@ -901,14 +1115,11 @@ function buildOneTimeProduct(args: any): androidpublisher_v3.Schema$OneTimeProdu
 const createOneTimeProduct: ToolDef = {
   name: 'google_create_one_time_product',
   description:
-    'Create a new one-time product (buy or rent) on Google Play using the monetization.onetimeproducts API. Pass listings and at least one purchase option with regional pricing. Purchase options are created ACTIVE by default under this upsert; use google_deactivate_purchase_option to pull one down.',
+    'Create a new one-time product (buy or rent) on Google Play using the monetization.onetimeproducts API. Existing product IDs are rejected; use google_update_one_time_product to modify one. Purchase options are created ACTIVE by default.',
   schema: z.object(oneTimeProductBody),
   handler: async (client, args) => {
     const body = buildOneTimeProduct(args);
-    return client.upsertOneTimeProduct(args.packageName, args.productId, body, {
-      allowMissing: true,
-      regionsVersionVersion: args.regionsVersion,
-    });
+    return client.createOneTimeProduct(args.packageName, args.productId, body, args.regionsVersion);
   },
 };
 
@@ -975,6 +1186,8 @@ const deactivatePurchaseOption: ToolDef = {
 export const googleTools: ToolDef[] = [
   // Edit lifecycle
   createEdit, commitEdit, validateEdit, deleteEdit,
+  // Play App Signing
+  enrollAppSigning, rotateAppSigningKey,
   // App details
   getDetails, updateDetails,
   // Store listing

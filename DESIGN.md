@@ -19,7 +19,7 @@ independently according to the credentials available at process startup.
 | `src/auth.ts` | Runs interactive Google OAuth through a localhost callback and stores the refresh credentials | Writes only to the per-user `~/.app-publish-mcp/google.json` store |
 | Package and registry metadata | Defines npm execution and discovery through MCP registries/marketplaces | Published artifacts contain compiled `dist`, package metadata, the license, and README documents |
 
-The tool registries currently provide 70 Apple tools and 45 Google tools. The
+The tool registries currently provide 71 Apple tools and 47 Google tools. The
 server also exposes `app_release_checklist` and `app_store_optimization` prompts,
 plus `app-publish://config` and `app-publish://supported-platforms` resources.
 

@@ -3,6 +3,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { AppleClient } from './apple/client.js';
 import { GoogleClient } from './google/client.js';
+import { formatGoogleApiError, GOOGLE_NOT_CONFIGURED_MESSAGE } from './google/errors.js';
 import { appleTools } from './apple/tools.js';
 import { googleTools } from './google/tools.js';
 import { loadSavedGoogleToken } from './auth.js';
@@ -23,6 +24,7 @@ const server = new McpServer({
 // ── Initialize clients from env ──
 let appleClient: AppleClient | null = null;
 let googleClient: GoogleClient | null = null;
+let googleAuthMethod: 'service_account' | 'oauth2' | 'saved_token' | 'none' = 'none';
 
 const appleKeyId = process.env.APPLE_KEY_ID;
 const appleIssuerId = process.env.APPLE_ISSUER_ID;
@@ -45,13 +47,16 @@ const googleRefreshToken = process.env.GOOGLE_REFRESH_TOKEN;
 
 if (googleSaPath) {
   googleClient = new GoogleClient({ serviceAccountPath: googleSaPath });
+  googleAuthMethod = 'service_account';
 } else if (googleClientId && googleClientSecret && googleRefreshToken) {
   googleClient = new GoogleClient({ clientId: googleClientId, clientSecret: googleClientSecret, refreshToken: googleRefreshToken });
+  googleAuthMethod = 'oauth2';
 } else {
   // Auto-load from saved token file
   const saved = loadSavedGoogleToken();
   if (saved) {
     googleClient = new GoogleClient({ clientId: saved.clientId, clientSecret: saved.clientSecret, refreshToken: saved.refreshToken });
+    googleAuthMethod = 'saved_token';
   }
 }
 
@@ -78,15 +83,15 @@ for (const tool of googleTools) {
   server.tool(tool.name, tool.description, tool.schema.shape, async (args: any) => {
     if (!googleClient) {
       return {
-        content: [{ type: 'text' as const, text: 'Google client not configured. Set GOOGLE_SERVICE_ACCOUNT_PATH env var.' }],
+        content: [{ type: 'text' as const, text: GOOGLE_NOT_CONFIGURED_MESSAGE }],
         isError: true,
       };
     }
     try {
       const result = await tool.handler(googleClient, args);
       return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-    } catch (err: any) {
-      return { content: [{ type: 'text' as const, text: `Error: ${err.message}` }], isError: true };
+    } catch (err: unknown) {
+      return { content: [{ type: 'text' as const, text: `Error: ${formatGoogleApiError(err)}` }], isError: true };
     }
   });
 }
@@ -130,9 +135,9 @@ server.prompt(
               '3. Use google_list_listings to check store listings across languages',
               '4. Use google_update_listing to update descriptions / release notes for each language',
               '5. Use google_upload_bundle to upload the .aab if not already uploaded',
-              '6. Use google_create_release to create a release on the target track (e.g. production)',
+              '6. Use google_create_release with explicit status=completed for a full rollout, or status=inProgress plus userFraction for a staged production rollout; draft only saves an unpublished release',
               '7. Use google_validate_edit to check for errors before committing',
-              '8. Use google_commit_edit to publish the changes',
+              '8. Use google_commit_edit to commit the edit, then report publication only if the release status is completed or inProgress (draft remains unpublished)',
               '',
             ].join('\n') : '',
             'For each step, confirm the result before proceeding. Report any errors and suggest fixes.',
@@ -216,7 +221,7 @@ server.resource(
       },
       google: {
         connected: !!googleClient,
-        authMethod: googleSaPath ? 'service_account' : (googleClientId ? 'oauth2' : (loadSavedGoogleToken() ? 'saved_token' : 'none')),
+        authMethod: googleAuthMethod,
       },
       tools: {
         apple: appleTools.length,
