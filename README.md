@@ -102,23 +102,10 @@ No local clone or installation is required. The MCP client configuration below r
 3. Create a **Service Account** and download the JSON key
 4. In Google Play Console, grant the service account access under **Settings > API access**
 
-### 4. Configure Environment
+### 4. Add to Claude Code
 
-```bash
-cp .env.example .env
-```
-
-Edit `.env`:
-```
-APPLE_KEY_ID=YOUR_KEY_ID
-APPLE_ISSUER_ID=YOUR_ISSUER_ID
-APPLE_P8_PATH=/path/to/AuthKey.p8
-GOOGLE_SERVICE_ACCOUNT_PATH=/path/to/service-account.json
-```
-
-### 5. Add to Claude Code
-
-Add to `~/.claude/settings.local.json`:
+Add the server and its credential environment variables to
+`~/.claude/settings.local.json`:
 
 ```json
 {
