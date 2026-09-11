@@ -35,7 +35,8 @@ This repository provides the `@kagayoi/app-publish-mcp` stdio MCP server. Read
   published metadata in the same change. Keep README content user-focused.
 - Keep `package.json`, `package-lock.json`, `server.json`, and release branch
   versions synchronized for a release. The publish workflow requires
-  `release/<version>` to match `package.json` and publishes with `NPM_TOKEN`.
+  `release/<version>` to match `package.json` and publishes through npm Trusted
+  Publishing with GitHub OIDC.
 
 ## Required validation
 
