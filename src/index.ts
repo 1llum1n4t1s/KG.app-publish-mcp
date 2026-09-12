@@ -125,7 +125,7 @@ server.prompt(
               '6. Use apple_assign_build to attach the build to the version',
               '7. Use apple_update_review_detail to set reviewer contact info and demo account if needed',
               '8. Use apple_get_age_rating to verify age rating is correct',
-              '9. Use apple_submit_for_review to submit for App Review',
+              '9. Use apple_submit_for_review to submit for App Review; pass submissionId for an existing prepared submission (all its items are submitted). If a submit response fails, check its state and reuse the same submissionId.',
               '',
             ].join('\n') : '',
             platform === 'android' || platform === 'both' ? [

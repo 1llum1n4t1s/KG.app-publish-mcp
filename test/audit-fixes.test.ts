@@ -119,24 +119,263 @@ test('apple_submit_for_review cancels a submission when attaching the version fa
   assert.equal(calls[2].options.body.data.attributes.canceled, true);
 });
 
-test('apple_submit_for_review preserves the submission ID when submit and cleanup both fail', async () => {
+test('apple_submit_for_review does not cancel when the submit response is uncertain', async () => {
   const tool = appleTools.find(candidate => candidate.name === 'apple_submit_for_review');
   assert.ok(tool);
-  let call = 0;
+  const calls: Array<{ path: string; options: any }> = [];
   const client = {
-    request: async () => {
-      call += 1;
-      if (call === 1) return { data: { id: 'submission-submit' } };
-      if (call === 2) return { data: { id: 'item' } };
-      if (call === 3) throw new Error('submit failed');
-      throw new Error('cancel failed');
+    request: async (path: string, options: any) => {
+      calls.push({ path, options });
+      if (calls.length === 1) return { data: { id: 'submission-submit' } };
+      if (calls.length === 2) return { data: { id: 'item' } };
+      throw new Error('submit response lost');
     },
   };
 
   await assert.rejects(
     () => tool.handler(client as any, { appId: 'app', versionId: 'version', platform: 'IOS' }),
-    /Review submission ID: submission-submit[\s\S]*Automatic cancellation failed: cancel failed[\s\S]*apple_cancel_submission/,
+    /Review submission ID: submission-submit[\s\S]*status is uncertain[\s\S]*not automatically canceled[\s\S]*submissionId "submission-submit"/,
   );
+  assert.equal(calls.length, 3);
+  assert.equal(calls[2].options.body.data.attributes.submitted, true);
+});
+
+test('apple_submit_for_review validates every item page and submits an existing draft without changing it', async () => {
+  const tool = appleTools.find(candidate => candidate.name === 'apple_submit_for_review');
+  assert.ok(tool);
+  const calls: Array<{ path: string; options: any }> = [];
+  const client = {
+    request: async (path: string, options: any = {}) => {
+      calls.push({ path, options });
+      if (calls.length === 1) {
+        return {
+          data: {
+            id: 'draft',
+            attributes: { platform: 'IOS', state: 'READY_FOR_REVIEW' },
+            relationships: { app: { data: { type: 'apps', id: 'app' } } },
+          },
+        };
+      }
+      if (calls.length === 2) {
+        return {
+          data: [
+            { relationships: { subscriptionVersion: { data: { id: 'subscription' } } } },
+            { relationships: { inAppPurchaseVersion: { data: { id: 'iap' } } } },
+          ],
+          links: { next: 'https://api.appstoreconnect.apple.com/v1/reviewSubmissions/draft/items?cursor=next' },
+        };
+      }
+      if (calls.length === 3) {
+        return {
+          data: [
+            { relationships: { appEvent: { data: { id: 'event' } } } },
+            { relationships: { appStoreVersion: { data: { id: 'version' } } } },
+          ],
+          links: { next: null },
+        };
+      }
+      return { data: { id: 'draft', attributes: { state: 'WAITING_FOR_REVIEW' } } };
+    },
+  };
+
+  const result = await tool.handler(client as any, {
+    appId: 'app',
+    versionId: 'version',
+    platform: 'IOS',
+    submissionId: 'draft',
+  });
+
+  assert.equal(result.data.id, 'draft');
+  assert.deepEqual(calls.map(call => call.path), [
+    '/reviewSubmissions/draft',
+    '/reviewSubmissions/draft/items',
+    '/reviewSubmissions/draft/items?cursor=next',
+    '/reviewSubmissions/draft',
+  ]);
+  assert.equal(calls[1].options.params.limit, '200');
+  assert.equal(calls[1].options.params.include, 'appStoreVersion');
+  assert.deepEqual(calls[2].options, {});
+  assert.equal(calls[3].options.method, 'PATCH');
+  assert.deepEqual(calls[3].options.body.data.attributes, { submitted: true });
+});
+
+test('apple_submit_for_review rejects an existing draft belonging to another app before reading items', async () => {
+  const tool = appleTools.find(candidate => candidate.name === 'apple_submit_for_review');
+  assert.ok(tool);
+  let calls = 0;
+  const client = {
+    request: async () => {
+      calls += 1;
+      return {
+        data: {
+          attributes: { platform: 'IOS', state: 'READY_FOR_REVIEW' },
+          relationships: { app: { data: { id: 'other-app' } } },
+        },
+      };
+    },
+  };
+
+  await assert.rejects(
+    () => tool.handler(client as any, {
+      appId: 'app', versionId: 'version', platform: 'IOS', submissionId: 'draft',
+    }),
+    /belongs to app "other-app", not requested app "app"/,
+  );
+  assert.equal(calls, 1);
+});
+
+test('apple_submit_for_review rejects an existing draft for another platform without mutation', async () => {
+  const tool = appleTools.find(candidate => candidate.name === 'apple_submit_for_review');
+  assert.ok(tool);
+  let calls = 0;
+  const client = {
+    request: async () => {
+      calls += 1;
+      return {
+        data: {
+          attributes: { platform: 'MAC_OS', state: 'READY_FOR_REVIEW' },
+          relationships: { app: { data: { id: 'app' } } },
+        },
+      };
+    },
+  };
+
+  await assert.rejects(
+    () => tool.handler(client as any, {
+      appId: 'app', versionId: 'version', platform: 'IOS', submissionId: 'draft',
+    }),
+    /is for platform "MAC_OS", not requested platform "IOS"/,
+  );
+  assert.equal(calls, 1);
+});
+
+test('apple_submit_for_review rejects an existing draft without the requested version after all pages', async () => {
+  const tool = appleTools.find(candidate => candidate.name === 'apple_submit_for_review');
+  assert.ok(tool);
+  const paths: string[] = [];
+  const client = {
+    request: async (path: string) => {
+      paths.push(path);
+      if (paths.length === 1) {
+        return {
+          data: {
+            attributes: { platform: 'IOS', state: 'READY_FOR_REVIEW' },
+            relationships: { app: { data: { id: 'app' } } },
+          },
+        };
+      }
+      if (paths.length === 2) {
+        return { data: [], links: { next: '/reviewSubmissions/draft/items?cursor=next' } };
+      }
+      return {
+        data: [{ relationships: { appStoreVersion: { data: { id: 'other-version' } } } }],
+        links: { next: null },
+      };
+    },
+  };
+
+  await assert.rejects(
+    () => tool.handler(client as any, {
+      appId: 'app', versionId: 'version', platform: 'IOS', submissionId: 'draft',
+    }),
+    /does not contain App Store version "version"[\s\S]*existing draft was not changed/i,
+  );
+  assert.deepEqual(paths, [
+    '/reviewSubmissions/draft',
+    '/reviewSubmissions/draft/items',
+    '/reviewSubmissions/draft/items?cursor=next',
+  ]);
+});
+
+test('apple_submit_for_review rejects an untrusted item pagination URL before sending credentials', async () => {
+  const tool = appleTools.find(candidate => candidate.name === 'apple_submit_for_review');
+  assert.ok(tool);
+  let calls = 0;
+  const client = {
+    request: async () => {
+      calls += 1;
+      if (calls === 1) {
+        return {
+          data: {
+            attributes: { platform: 'IOS', state: 'READY_FOR_REVIEW' },
+            relationships: { app: { data: { id: 'app' } } },
+          },
+        };
+      }
+      return {
+        data: [],
+        links: { next: 'https://example.com/v1/reviewSubmissions/draft/items?cursor=stolen' },
+      };
+    },
+  };
+
+  await assert.rejects(
+    () => tool.handler(client as any, {
+      appId: 'app', versionId: 'version', platform: 'IOS', submissionId: 'draft',
+    }),
+    /invalid pagination URL/,
+  );
+  assert.equal(calls, 2);
+});
+
+test('apple_submit_for_review rejects a non-ready draft without mutation', async () => {
+  const tool = appleTools.find(candidate => candidate.name === 'apple_submit_for_review');
+  assert.ok(tool);
+  let calls = 0;
+  const client = {
+    request: async () => {
+      calls += 1;
+      return {
+        data: {
+          attributes: { platform: 'IOS', state: 'COMPLETE' },
+          relationships: { app: { data: { id: 'app' } } },
+        },
+      };
+    },
+  };
+
+  await assert.rejects(
+    () => tool.handler(client as any, {
+      appId: 'app', versionId: 'version', platform: 'IOS', submissionId: 'draft',
+    }),
+    /not READY_FOR_REVIEW \(current state: COMPLETE\)/,
+  );
+  assert.equal(calls, 1);
+});
+
+test('apple_submit_for_review treats a matching submitted draft retry as successful without another PATCH', async () => {
+  const tool = appleTools.find(candidate => candidate.name === 'apple_submit_for_review');
+  assert.ok(tool);
+
+  for (const state of ['WAITING_FOR_REVIEW', 'IN_REVIEW']) {
+    const calls: Array<{ path: string; options: any }> = [];
+    const submission = {
+      data: {
+        id: 'submitted',
+        attributes: { platform: 'IOS', state },
+        relationships: { app: { data: { id: 'app' } } },
+      },
+    };
+    const client = {
+      request: async (path: string, options: any = {}) => {
+        calls.push({ path, options });
+        if (calls.length === 1) return submission;
+        return {
+          data: [{ relationships: { appStoreVersion: { data: { id: 'version' } } } }],
+          links: { next: null },
+        };
+      },
+    };
+
+    const result = await tool.handler(client as any, {
+      appId: 'app', versionId: 'version', platform: 'IOS', submissionId: 'submitted',
+    });
+    assert.equal(result, submission);
+    assert.deepEqual(calls.map(call => call.path), [
+      '/reviewSubmissions/submitted',
+      '/reviewSubmissions/submitted/items',
+    ]);
+  }
 });
 
 test('google_promote_release selects the newest active source release independent of array order', async () => {

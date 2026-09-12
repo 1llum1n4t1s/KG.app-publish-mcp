@@ -554,14 +554,120 @@ const updateReviewDetail: ToolDef = {
 const submitForReview: ToolDef = {
   name: 'apple_submit_for_review',
   description:
-    'Submit an App Store version for review using the reviewSubmissions flow (create a review submission, attach the version, then submit). Replaces the retired appStoreVersionSubmissions create endpoint.',
+    'Submit an App Store version for review. By default, creates a review submission and attaches the version. Pass submissionId to submit an existing READY_FOR_REVIEW draft without changing it; all items already in that draft are submitted together. A matching submission already WAITING_FOR_REVIEW or IN_REVIEW is returned without resubmitting.',
   schema: z.object({
     appId: z.string().describe('App ID'),
     versionId: z.string().describe('App Store Version ID to submit'),
     platform: z.enum(['IOS', 'MAC_OS', 'TV_OS', 'VISION_OS']).default('IOS').describe('Platform of the version being submitted'),
+    submissionId: z.string().trim().min(1).optional().describe('Existing Review Submission ID. A READY_FOR_REVIEW draft must already contain versionId; matching WAITING_FOR_REVIEW or IN_REVIEW submissions are treated as successful retries.'),
   }),
   handler: async (client, args) => {
-    // Step 1: create a review submission for the app
+    const submit = async (submissionId: string) => {
+      try {
+        return await client.request(`/reviewSubmissions/${submissionId}`, {
+          method: 'PATCH',
+          body: {
+            data: {
+              type: 'reviewSubmissions',
+              id: submissionId,
+              attributes: { submitted: true },
+            },
+          },
+        });
+      } catch (err: any) {
+        const message = err?.message ?? String(err);
+        const exportComplianceHint = message.includes('usesNonExemptEncryption')
+          ? '\n\nHint: the build is missing its export-compliance answer. Set it in App Store Connect or set ' +
+            "ITSAppUsesNonExemptEncryption in the app's Info.plist, then retry apple_submit_for_review."
+          : '';
+        throw new Error(
+          `${message}${exportComplianceHint}\n\nReview submission ID: ${submissionId}. The submission status is uncertain, so it was not automatically canceled. ` +
+          `Inspect its current state in App Store Connect. If it is still READY_FOR_REVIEW, retry apple_submit_for_review with submissionId "${submissionId}".`,
+          { cause: err },
+        );
+      }
+    };
+
+    if (args.submissionId) {
+      const submissionId = args.submissionId;
+      const submission = await client.request(`/reviewSubmissions/${submissionId}`, {
+        params: { 'fields[reviewSubmissions]': 'platform,state,app', include: 'app' },
+      });
+      const submissionAppId = submission.data?.relationships?.app?.data?.id;
+      const submissionPlatform = submission.data?.attributes?.platform;
+      const submissionState = submission.data?.attributes?.state;
+
+      if (submissionAppId !== args.appId) {
+        throw new Error(
+          `Review submission "${submissionId}" belongs to app "${submissionAppId ?? 'unknown'}", not requested app "${args.appId}".`,
+        );
+      }
+      if (submissionPlatform !== args.platform) {
+        throw new Error(
+          `Review submission "${submissionId}" is for platform "${submissionPlatform ?? 'unknown'}", not requested platform "${args.platform}".`,
+        );
+      }
+      const alreadySubmitted = submissionState === 'WAITING_FOR_REVIEW' || submissionState === 'IN_REVIEW';
+      if (submissionState !== 'READY_FOR_REVIEW' && !alreadySubmitted) {
+        throw new Error(
+          `Review submission "${submissionId}" is not READY_FOR_REVIEW (current state: ${submissionState ?? 'unknown'}). ` +
+          'It may already have been submitted; inspect its current state in App Store Connect before retrying.',
+        );
+      }
+
+      let itemsPath: string | undefined = `/reviewSubmissions/${submissionId}/items`;
+      let itemsParams: Record<string, string> | undefined = {
+        'fields[reviewSubmissionItems]': 'appStoreVersion',
+        include: 'appStoreVersion',
+        limit: '200',
+      };
+      const visitedPages = new Set<string>();
+      let containsVersion = false;
+
+      while (itemsPath) {
+        if (visitedPages.has(itemsPath)) {
+          throw new Error(`Apple returned a pagination cycle while reading review submission "${submissionId}".`);
+        }
+        visitedPages.add(itemsPath);
+
+        const items: any = await client.request(itemsPath, itemsParams ? { params: itemsParams } : {});
+        containsVersion ||= (items.data ?? []).some(
+          (item: any) => item.relationships?.appStoreVersion?.data?.id === args.versionId,
+        );
+        const next = items.links?.next;
+        if (!containsVersion && next) {
+          if (typeof next !== 'string') {
+            throw new Error(`Apple returned an invalid pagination URL while reading review submission "${submissionId}".`);
+          }
+          const normalizedNext = next.startsWith('/v1/')
+            ? `https://api.appstoreconnect.apple.com${next}`
+            : next.startsWith('/')
+              ? `https://api.appstoreconnect.apple.com/v1${next}`
+              : next;
+          const nextUrl = new URL(normalizedNext, 'https://api.appstoreconnect.apple.com/v1/');
+          const expectedPath = `/v1/reviewSubmissions/${encodeURIComponent(submissionId)}/items`;
+          if (nextUrl.origin !== 'https://api.appstoreconnect.apple.com' || nextUrl.pathname !== expectedPath) {
+            throw new Error(`Apple returned an invalid pagination URL while reading review submission "${submissionId}".`);
+          }
+          itemsPath = `${nextUrl.pathname.slice('/v1'.length)}${nextUrl.search}`;
+        } else {
+          itemsPath = undefined;
+        }
+        itemsParams = undefined;
+      }
+
+      if (!containsVersion) {
+        throw new Error(
+          `Review submission "${submissionId}" does not contain App Store version "${args.versionId}". ` +
+          'The existing draft was not changed.',
+        );
+      }
+
+      if (alreadySubmitted) return submission;
+      return submit(submissionId);
+    }
+
+    // Create a new review submission for the app.
     const submission = await client.request('/reviewSubmissions', {
       method: 'POST',
       body: {
@@ -576,7 +682,7 @@ const submitForReview: ToolDef = {
     });
     const submissionId = submission.data.id;
 
-    // Steps 2-3 must either finish or clean up the submission created above.
+    // If attachment fails, clean up only the incomplete submission created here.
     try {
       await client.request('/reviewSubmissionItems', {
         method: 'POST',
@@ -587,18 +693,6 @@ const submitForReview: ToolDef = {
               reviewSubmission: { data: { type: 'reviewSubmissions', id: submissionId } },
               appStoreVersion: { data: { type: 'appStoreVersions', id: args.versionId } },
             },
-          },
-        },
-      });
-
-      // Step 3: submit the review submission
-      return await client.request(`/reviewSubmissions/${submissionId}`, {
-        method: 'PATCH',
-        body: {
-          data: {
-            type: 'reviewSubmissions',
-            id: submissionId,
-            attributes: { submitted: true },
           },
         },
       });
@@ -633,6 +727,8 @@ const submitForReview: ToolDef = {
         { cause: err },
       );
     }
+
+    return submit(submissionId);
   },
 };
 
