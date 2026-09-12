@@ -47,10 +47,16 @@ npm ci
 npm run lint
 npm test
 npm run build
+npm run test:stdio
 npm pack --dry-run
 git diff --check
 ```
 
 For runtime or protocol changes, add or update automated coverage, initialize the
 built stdio server with an MCP client, and exercise the affected tool path against
-an appropriately authorized account or a safe fixture.
+an appropriately authorized account or a safe fixture. `npm run test:stdio`
+rebuilds and tests Apple review submission and response-loss retries through an
+MCP client using `test/fixtures/apple-review.mjs`, without live credentials or
+network access. It is separate from `npm test`; extend coverage for other
+affected paths as needed. Preserve the submission ownership and failure
+boundaries described in [DESIGN.md](DESIGN.md#apple-review-submission).

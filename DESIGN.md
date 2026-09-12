@@ -42,6 +42,27 @@ create an edit, perform mutations, optionally validate it, and explicitly commit
 or delete it. Review and monetization operations use their corresponding direct
 Android Publisher endpoints.
 
+### Apple review submission
+
+`apple_submit_for_review` has two ownership paths. Without `submissionId`, it
+creates a review submission and attaches the requested app version. If attachment
+fails, it attempts to cancel only that newly created incomplete submission and
+reports the submission ID and cleanup result.
+
+With `submissionId`, it checks the existing submission's app, platform, state,
+and membership of the requested version before any mutation. Item pagination
+accepts only the same submission's items endpoint on Apple's API origin and
+rejects cycles. A `READY_FOR_REVIEW` draft is submitted with all existing items
+intact; a matching `WAITING_FOR_REVIEW` or `IN_REVIEW` submission is returned
+without resubmitting. Other states or mismatches fail without changing the draft.
+
+New submissions and validated ready drafts use a `submitted: true` PATCH.
+Failure at this boundary leaves
+the submission intact and reports its ID for inspection and reuse: a lost response
+does not prove Apple rejected the request. This deliberately limits automatic
+cleanup to attachment failure and avoids canceling an accepted review. User
+recovery instructions are in [README.md](README.md#submit-an-ios-app-update).
+
 ## Authentication model
 
 - Apple is connected only when `APPLE_KEY_ID`, `APPLE_ISSUER_ID`, and

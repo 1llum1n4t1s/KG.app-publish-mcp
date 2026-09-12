@@ -103,15 +103,37 @@ No local clone or installation is required. The MCP client configuration below r
 
 ### 3. Google Credentials
 
+Choose a service account or OAuth. You can configure only Apple or only Google;
+omit the other platform's credential variables.
+
+**Service account:**
+
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Enable **Google Play Android Developer API**
 3. Create a **Service Account** and download the JSON key
 4. In Google Play Console, grant the service account access under **Settings > API access**
 
+**OAuth:** create a Desktop app OAuth client in Google Cloud Console, set
+`GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in your terminal environment, then run:
+
+```sh
+npx --yes @kagayoi/app-publish-mcp@latest auth google
+```
+
+Complete the browser sign-in on the same computer. The command listens on
+`127.0.0.1:19847` and saves credentials to `~/.app-publish-mcp/google.json`.
+Restart the MCP server to load them. Alternatively, provide all three variables
+`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `GOOGLE_REFRESH_TOKEN` to the server.
+A service account takes precedence over OAuth; a complete OAuth environment takes
+precedence over saved credentials. An incomplete OAuth environment still allows
+saved credentials to load.
+
 ### 4. Add to Claude Code
 
-Add the server and its credential environment variables to
-`~/.claude/settings.local.json`:
+Add the following configuration to `.mcp.json` in your project root, as described
+in the [Claude Code MCP documentation](https://code.claude.com/docs/en/mcp).
+The `${...}` entries read credentials from the environment that starts Claude
+Code; remove entries for a platform or authentication method you do not use.
 
 ```json
 {
@@ -120,10 +142,10 @@ Add the server and its credential environment variables to
       "command": "npx",
       "args": ["--yes", "@kagayoi/app-publish-mcp@latest"],
       "env": {
-        "APPLE_KEY_ID": "YOUR_KEY_ID",
-        "APPLE_ISSUER_ID": "YOUR_ISSUER_ID",
-        "APPLE_P8_PATH": "/path/to/AuthKey.p8",
-        "GOOGLE_SERVICE_ACCOUNT_PATH": "/path/to/service-account.json"
+        "APPLE_KEY_ID": "${APPLE_KEY_ID}",
+        "APPLE_ISSUER_ID": "${APPLE_ISSUER_ID}",
+        "APPLE_P8_PATH": "${APPLE_P8_PATH}",
+        "GOOGLE_SERVICE_ACCOUNT_PATH": "${GOOGLE_SERVICE_ACCOUNT_PATH}"
       }
     }
   }
