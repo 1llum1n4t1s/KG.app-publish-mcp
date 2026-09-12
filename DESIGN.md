@@ -49,13 +49,35 @@ Android Publisher endpoints.
   one minute before expiration. `APPLE_VENDOR_NUMBER` is optional.
 - Google chooses credentials in this order: `GOOGLE_SERVICE_ACCOUNT_PATH`; the
   complete `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` +
-  `GOOGLE_REFRESH_TOKEN` set; then the saved per-user OAuth token file.
+  `GOOGLE_REFRESH_TOKEN` set; then the saved per-user OAuth token file. A partial
+  OAuth environment configuration still permits saved-token fallback. Missing,
+  unreadable, malformed, or incomplete saved tokens are treated as unavailable.
 - Missing credentials do not remove tools from discovery. Invoking an
   unconfigured platform tool returns an MCP error, allowing one installation to
   advertise both platforms while configuring only one.
 - The configuration resource reports connection state, authentication method,
   masked Apple identifiers, and tool counts; it does not return private keys or
-  token values.
+  token values. Connection state means a client was configured, not that an
+  upstream authentication check succeeded.
+
+## Package publication boundary
+
+`.github/workflows/npm-publish.yml` runs on pushes to `release/**` or manual
+dispatch. On a release branch it checks the branch suffix against the package
+version, then installs the lockfile dependencies and builds before publishing.
+Manual dispatch on other branches does not run that version-name check.
+
+Publication uses npm Trusted Publishing through GitHub OIDC, with
+`id-token: write`, an explicitly installed OIDC-capable npm CLI, and public
+publication with provenance to the npm registry. The npm package's trusted
+publisher configuration is an external prerequisite; no long-lived npm token
+is supplied by the workflow. Checkout does not persist Git credentials, and
+the workflow has read-only repository content permissions. This separates
+package publication authority from repository write access.
+
+Release validation commands and version synchronization requirements are defined
+in [`AGENTS.md`](AGENTS.md); the publish workflow itself runs dependency
+installation and compilation, not the full local validation suite.
 
 ## Invariants
 
@@ -64,10 +86,12 @@ Android Publisher endpoints.
 - MCP stdout contains protocol messages only.
 - Secrets and generated output stay outside Git: `dist/`, `.env`, `.p8` files,
   service-account key files, and the per-user OAuth token store are not source.
-- The npm package version is the runtime server version. Release branches must be
-  named `release/<package.json version>`; CI builds before publishing.
-- Local file uploads are caller-authorized inputs and are sent only to the chosen
-  platform API endpoint.
+- The npm package version is the runtime server version.
+- Local file uploads are caller-authorized inputs. Apple screenshot reservations
+  return upload-operation URLs, methods, headers, and byte ranges; the client
+  sends those ranges to the returned URLs without adding the App Store Connect
+  JWT, then the handler commits the checksum and upload status through the API.
+  Google uploads use the Android Publisher client.
 
 ## Adopted design decisions
 
