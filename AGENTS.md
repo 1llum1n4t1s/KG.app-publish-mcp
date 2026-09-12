@@ -19,7 +19,7 @@ This repository provides the `@kagayoi/app-publish-mcp` stdio MCP server. Read
 ## Development rules
 
 - Use the committed `package-lock.json` with npm and preserve compatibility with
-  the `package.json` engine requirement (`node >=18`). Source is strict ESM
+  the `package.json` engine requirement (`node >=22`). Source is strict ESM
   TypeScript; generated `dist/` files remain untracked.
 - Keep MCP stdout reserved for protocol traffic. Send startup and diagnostic
   messages to stderr.

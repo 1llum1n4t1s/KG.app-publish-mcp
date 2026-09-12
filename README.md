@@ -8,6 +8,9 @@ A unified [MCP (Model Context Protocol)](https://modelcontextprotocol.io) server
 
 ## When to Use
 
+Requires **Node.js 22 or later**. Upgrade Node.js before installing or updating
+from an older runtime.
+
 Use this MCP when you need to:
 
 - **"Update my app's App Store description and keywords"** — modify version localizations, app info localizations
@@ -141,6 +144,20 @@ Add the server and its credential environment variables to
 7. apple_update_review_detail → set reviewer contact info
 8. apple_submit_for_review → submit!
 ```
+
+If you already prepared a review submission in App Store Connect (for example,
+an app version together with subscriptions), pass its `submissionId` to
+`apple_submit_for_review` along with `appId`, `versionId`, and `platform`.
+The tool verifies the app, platform, and attached version, then submits **all
+items in that existing submission** without replacing them. Without
+`submissionId`, it creates a new submission containing only the app version.
+
+If the final submit request fails or times out, the tool preserves the submission
+and reports its ID: Apple may have accepted the request. Check its state in
+App Store Connect before retrying with that same `submissionId`. Do not create
+a new submission or cancel an accepted review just to recover a missing response.
+Retrying a matching submission in `WAITING_FOR_REVIEW` or `IN_REVIEW` returns
+its current state without submitting it again.
 
 ### Release an Android app
 

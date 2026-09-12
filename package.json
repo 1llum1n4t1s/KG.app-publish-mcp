@@ -1,6 +1,6 @@
 {
   "name": "@kagayoi/app-publish-mcp",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "mcpName": "io.github.1llum1n4t1s/app-publish",
   "description": "Unified MCP server for App Store Connect & Google Play Console",
   "type": "module",
@@ -13,7 +13,8 @@
     "dev": "tsx src/index.ts",
     "start": "node dist/index.js",
     "lint": "tsc --noEmit",
-    "test": "tsx --test test/google-app-signing.test.ts test/audit-fixes.test.ts"
+    "test": "tsx --test test/google-app-signing.test.ts test/audit-fixes.test.ts",
+    "test:stdio": "npm run build && node --test test/submission-stdio.test.mjs"
   },
   "keywords": [
     "mcp",
@@ -43,7 +44,7 @@
     "url": "https://github.com/1llum1n4t1s/KG.app-publish-mcp/issues"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   },
   "files": [
     "dist/**/*",
@@ -55,11 +56,11 @@
     "google-auth-library": "^11.0.2",
     "googleapis": "^178.0.0",
     "jsonwebtoken": "^9.0.3",
-    "zod": "^4.5.4"
+    "zod": "^4.6.2"
   },
   "devDependencies": {
     "@types/jsonwebtoken": "^9.0.10",
-    "@types/node": "^26.4.0",
+    "@types/node": "^26.5.1",
     "tsx": "^4.23.13",
     "typescript": "^7.0.2"
   }

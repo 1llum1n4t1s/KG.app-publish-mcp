@@ -4,6 +4,8 @@
 
 ## Install
 
+Requires Node.js 22 or later.
+
 ```json
 {
   "mcpServers": {
@@ -49,7 +51,7 @@
 - apple_get_age_rating — Get age rating declaration
 - apple_update_age_rating — Update age rating declaration
 - apple_update_review_detail — Update App Review contact info and notes
-- apple_submit_for_review — Submit a version for App Review
+- apple_submit_for_review — Submit a version for App Review; optional submissionId submits all items in a verified existing submission. Failed submit requests preserve the submission for state verification and retry with the same ID.
 - apple_cancel_submission — Cancel a pending submission
 - apple_get_pricing — Get current pricing info
 - apple_set_price — Set app price tier
