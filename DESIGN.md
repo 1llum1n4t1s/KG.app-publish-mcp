@@ -85,8 +85,18 @@ recovery instructions are in [README.md](README.md#submit-an-ios-app-update).
 
 `.github/workflows/npm-publish.yml` runs on pushes to `release/**` or manual
 dispatch. On a release branch it checks the branch suffix against the package
-version, then installs the lockfile dependencies and builds before publishing.
+version, then installs the lockfile dependencies and builds before packaging.
 Manual dispatch on other branches does not run that version-name check.
+
+The workflow runs `npm pack --json` and passes its result to
+`scripts/verify-package.mjs`. The verifier checks the package name and version
+against the pack result and archived manifest, verifies version consistency
+with the lockfile and server metadata, requires the CLI and platform client entry
+files plus the license and README, and rejects test/dependency directories and
+selected credential filenames and key extensions. These are artifact checks,
+not a general secret scanner. Publication uses that same verified tarball rather
+than repacking the working tree, keeping the inspected and published artifact
+identical.
 
 Publication uses npm Trusted Publishing through GitHub OIDC, with
 `id-token: write`, an explicitly installed OIDC-capable npm CLI, and public
@@ -98,7 +108,8 @@ package publication authority from repository write access.
 
 Release validation commands and version synchronization requirements are defined
 in [`AGENTS.md`](AGENTS.md); the publish workflow itself runs dependency
-installation and compilation, not the full local validation suite.
+installation, compilation, and artifact verification, not the full local
+validation suite.
 
 ## Invariants
 

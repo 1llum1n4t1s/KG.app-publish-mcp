@@ -54,6 +54,13 @@ npm pack --dry-run
 git diff --check
 ```
 
+For release validation, also run `npm pack --json > pack-result.json` followed by
+`node scripts/verify-package.mjs` after building. The verifier requires `tar` on
+PATH and the pack result and tarball in the repository root. Publish only the
+verified tarball, as the [publication workflow](.github/workflows/npm-publish.yml)
+does; the artifact checks and rationale are described in
+[DESIGN.md](DESIGN.md#package-publication-boundary).
+
 For runtime or protocol changes, add or update automated coverage, initialize the
 built stdio server with an MCP client, and exercise the affected tool path against
 an appropriately authorized account or a safe fixture. `npm run test:stdio`
