@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
+const server = JSON.parse(readFileSync('server.json', 'utf8'));
+const lock = JSON.parse(readFileSync('package-lock.json', 'utf8'));
+const [pack] = Object.values(JSON.parse(readFileSync('pack-result.json', 'utf8')));
+assert.equal(pack.name, pkg.name);
+for (const version of [pack.version, server.version, server.packages[0].version, lock.version, lock.packages[''].version]) assert.equal(version, pkg.version);
+const archived = JSON.parse(execFileSync('tar', ['-xOf', pack.filename, 'package/package.json'], { encoding: 'utf8' }));
+assert.equal(archived.name, pkg.name);
+assert.equal(archived.version, pkg.version);
+for (const required of ['dist/cli.js', 'dist/index.js', 'dist/google/client.js', 'dist/apple/client.js', 'LICENSE', 'README.md']) assert.ok(pack.files.some(f => f.path === required), required);
+for (const file of pack.files) assert.ok(!/(^|\/)(?:\.env|secrets\.json|test|node_modules)(\/|$)|\.(?:p8|pem|key|pfx)$/.test(file.path), file.path);
+console.error(`Verified ${pack.filename}: ${pack.files.length} files, integrity=${pack.integrity}`);

@@ -45,5 +45,10 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Publish
-        run: npm publish --access public --provenance --registry=https://registry.npmjs.org/
+      - name: Package and verify publication artifact
+        run: |
+          npm pack --json > pack-result.json
+          node scripts/verify-package.mjs
+
+      - name: Publish verified artifact
+        run: npm publish "$(node -p "Object.values(require('./pack-result.json'))[0].filename")" --access public --provenance --registry=https://registry.npmjs.org/
