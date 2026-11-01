@@ -21,6 +21,8 @@ This repository provides the `@kagayoi/app-publish-mcp` stdio MCP server. Read
 - Use the committed `package-lock.json` with npm and preserve compatibility with
   the `package.json` engine requirement (`node >=22`). Source is strict ESM
   TypeScript; generated `dist/` files remain untracked.
+  Development and publication use Node 26 and npm 12.2.1; dependency CI also
+  validates Node 22 to cover the supported minimum major.
 - Keep MCP stdout reserved for protocol traffic. Send startup and diagnostic
   messages to stderr.
 - Add platform operations as `ToolDef` entries and include them in the matching
@@ -57,6 +59,8 @@ built stdio server with an MCP client, and exercise the affected tool path again
 an appropriately authorized account or a safe fixture. `npm run test:stdio`
 rebuilds and tests Apple review submission and response-loss retries through an
 MCP client using `test/fixtures/apple-review.mjs`, without live credentials or
-network access. It is separate from `npm test`; extend coverage for other
+network access. It also covers screenshot upload bytes, Google product pricing,
+and saved-token fallback using `test/fixtures/upload-pricing.mjs`.
+It is separate from `npm test`; extend coverage for other
 affected paths as needed. Preserve the submission ownership and failure
 boundaries described in [DESIGN.md](DESIGN.md#apple-review-submission).
