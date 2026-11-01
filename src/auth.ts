@@ -13,7 +13,7 @@ import { OAuth2Client } from 'google-auth-library';
 import { createServer } from 'http';
 import { execFile } from 'child_process';
 import { randomBytes } from 'crypto';
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 
@@ -23,8 +23,6 @@ const GOOGLE_OAUTH_CALLBACK_HOST = '127.0.0.1';
 const GOOGLE_OAUTH_CALLBACK_PORT = 19847;
 const GOOGLE_OAUTH_CALLBACK_ORIGIN = `http://${GOOGLE_OAUTH_CALLBACK_HOST}:${GOOGLE_OAUTH_CALLBACK_PORT}`;
 
-// Embedded OAuth client — registered as "Desktop app" type so no client secret leak risk
-const EMBEDDED_CLIENT_ID = ''; // will be set by user or embedded
 const SCOPES = ['https://www.googleapis.com/auth/androidpublisher'];
 
 interface TokenStore {
@@ -62,7 +60,6 @@ export function parseSavedGoogleToken(raw: string): TokenStore | null {
 }
 
 export function loadSavedGoogleToken(): TokenStore | null {
-  if (!existsSync(GOOGLE_TOKEN_PATH)) return null;
   try {
     return parseSavedGoogleToken(readFileSync(GOOGLE_TOKEN_PATH, 'utf-8'));
   } catch {

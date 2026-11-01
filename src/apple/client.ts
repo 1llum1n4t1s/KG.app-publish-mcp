@@ -122,12 +122,12 @@ export class AppleClient {
       length?: number;
       offset?: number;
     },
-    filePath: string,
+    source: string | Buffer<ArrayBuffer>,
   ): Promise<void> {
     if (!operation.url || !operation.method) {
       throw new Error('Apple upload operation missing url or method');
     }
-    const fullBytes = readFileSync(filePath);
+    const fullBytes = typeof source === 'string' ? readFileSync(source) : source;
     const start = operation.offset ?? 0;
     const len = operation.length ?? fullBytes.length - start;
     const slice = fullBytes.subarray(start, start + len);

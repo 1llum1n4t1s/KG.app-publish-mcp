@@ -1,4 +1,4 @@
-import { google, androidpublisher_v3 } from 'googleapis';
+import { androidpublisher, type androidpublisher_v3 } from 'googleapis/build/src/apis/androidpublisher/index.js';
 import { GoogleAuth, OAuth2Client } from 'google-auth-library';
 import { readFileSync } from 'fs';
 import { extname } from 'path';
@@ -81,7 +81,7 @@ export class GoogleClient {
       throw new Error('Google client requires either serviceAccountPath or clientId+clientSecret+refreshToken');
     }
 
-    this.publisher = google.androidpublisher({
+    this.publisher = androidpublisher({
       version: 'v3',
       auth: auth as any,
     });

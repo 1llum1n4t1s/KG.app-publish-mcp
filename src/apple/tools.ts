@@ -359,7 +359,7 @@ const uploadScreenshot: ToolDef = {
       }
 
       for (const op of operations) {
-        await client.uploadOperation(op, args.filePath);
+        await client.uploadOperation(op, fileBytes);
       }
 
       // Step 3: Commit

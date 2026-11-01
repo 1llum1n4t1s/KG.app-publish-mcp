@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { androidpublisher_v3 } from 'googleapis';
+import type { androidpublisher_v3 } from 'googleapis/build/src/apis/androidpublisher/v3.js';
 import { GoogleClient } from './client.js';
 
 interface ToolDef {
@@ -937,12 +937,6 @@ const createSubscription: ToolDef = {
         benefits: l.benefits,
       })),
       basePlans: args.basePlans.map((bp: any) => {
-        const priceToMoney = (micros: string, currency: string) => {
-          const n = BigInt(micros);
-          const unitsBig = n / 1_000_000n;
-          const nanos = Number((n % 1_000_000n) * 1_000n);
-          return { currencyCode: currency, units: unitsBig.toString(), nanos };
-        };
         return {
           basePlanId: bp.basePlanId,
           state: 'DRAFT',
@@ -1081,13 +1075,14 @@ const oneTimeProductBody = {
     .describe('Google Play regions version. Default 2022/02 matches Google API expectations.'),
 };
 
+function priceToMoney(micros: string, currency: string) {
+  const n = BigInt(micros);
+  const unitsBig = n / 1_000_000n;
+  const nanos = Number((n % 1_000_000n) * 1_000n);
+  return { currencyCode: currency, units: unitsBig.toString(), nanos };
+}
+
 function buildOneTimeProduct(args: any): androidpublisher_v3.Schema$OneTimeProduct {
-  const priceToMoney = (micros: string, currency: string) => {
-    const n = BigInt(micros);
-    const unitsBig = n / 1_000_000n;
-    const nanos = Number((n % 1_000_000n) * 1_000n);
-    return { currencyCode: currency, units: unitsBig.toString(), nanos };
-  };
   return {
     packageName: args.packageName,
     productId: args.productId,

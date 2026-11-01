@@ -111,7 +111,9 @@ installation and compilation, not the full local validation suite.
 - Local file uploads are caller-authorized inputs. Apple screenshot reservations
   return upload-operation URLs, methods, headers, and byte ranges; the client
   sends those ranges to the returned URLs without adding the App Store Connect
-  JWT, then the handler commits the checksum and upload status through the API.
+  JWT. The handler reads the screenshot once and reuses those bytes for the
+  reservation size, every upload operation, and the committed checksum and upload
+  status through the API.
   Google uploads use the Android Publisher client.
 
 ## Adopted design decisions
@@ -124,6 +126,9 @@ installation and compilation, not the full local validation suite.
 - **Thin platform clients over official APIs:** preserves platform semantics and
   avoids browser automation. Platform differences, including Google's edit
   lifecycle and Apple's upload operations, remain visible to callers.
+  Google imports the Android Publisher API factory directly so stdio startup
+  does not load unrelated Google API families. Authentication remains configured
+  on the API client rather than through global Google SDK options.
 - **Multiple Google authentication modes:** service accounts support automation,
   while OAuth supports user-scoped access. The saved-token convenience introduces
   local credential state, so it is stored outside the repository with owner-only
