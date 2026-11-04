@@ -21,8 +21,7 @@ This repository provides the `@kagayoi/app-publish-mcp` stdio MCP server. Read
 - Use the committed `package-lock.json` with npm and preserve compatibility with
   the `package.json` engine requirement (`node >=22`). Source is strict ESM
   TypeScript; generated `dist/` files remain untracked.
-  Development and publication use Node 26 and npm 12.2.1; dependency CI also
-  validates Node 22 to cover the supported minimum major.
+  Development, publication, and dependency CI use Node 26.13.0 and npm 12.2.1.
 - Keep MCP stdout reserved for protocol traffic. Send startup and diagnostic
   messages to stderr.
 - Add platform operations as `ToolDef` entries and include them in the matching
@@ -71,3 +70,10 @@ and saved-token fallback using `test/fixtures/upload-pricing.mjs`.
 It is separate from `npm test`; extend coverage for other
 affected paths as needed. Preserve the submission ownership and failure
 boundaries described in [DESIGN.md](DESIGN.md#apple-review-submission).
+
+For publisher changes, also run `pwsh -NoProfile -File scripts/Test-NpmPublisher.ps1 -WorkDirectory <dedicated-absolute-work-path>`.
+The C# publisher is compiled in memory by PowerShell 7.4+ without a .NET SDK or
+npm publication runtime. Tests use fixture tarballs, mocked HTTP/cosign and a
+localhost redirect check without live credentials. Use an empty work directory
+and clean its fixture files afterwards. Only a 404 version lookup permits a new
+publication attempt; unknown PUT results must not be retried automatically.

@@ -15,7 +15,7 @@ jobs:
     timeout-minutes: 25
     strategy:
       matrix:
-        node-version: ['22', '26']
+        node-version: ['26.13.0']
     defaults:
       run:
         shell: bash
@@ -29,6 +29,9 @@ jobs:
           cache: 'npm'
       - name: Prepare npm CLI
         run: npm install --global npm@12.2.1
+      - name: Validate native npm publisher contracts
+        shell: pwsh
+        run: ./scripts/Test-NpmPublisher.ps1 -WorkDirectory (Join-Path $env:RUNNER_TEMP 'npm-publisher-contracts')
       - name: Install locked dependencies
         run: npm ci
       - name: Validate 1

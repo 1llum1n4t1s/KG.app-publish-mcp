@@ -1,6 +1,6 @@
 name: Publish to npm
 
-# npm publish は npm Trusted Publishing の OIDC 認証を使う。
+# 公開は native C# / .NET / cosign（PowerShell入口）と npm Trusted Publishing の OIDC 認証を使う。
 # 発火: release/x.y.z ブランチの push、または手動実行。
 
 on:
@@ -17,17 +17,21 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
+      - name: Checkout release commit with native git
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git init .
+          git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
+          auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" fetch --no-tags --depth=1 origin "$GITHUB_SHA"
+          git checkout --detach FETCH_HEAD
 
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: "26"
-          cache: "npm"
-
-      - name: Prepare OIDC-capable npm CLI
-        run: npm install --global npm@12.2.1
+      - name: Prepare native Node build toolchain
+        shell: pwsh
+        run: ./scripts/Initialize-NodeBuild.ps1 -Version '26.13.0' -NpmVersion '12.2.1'
 
       - name: Verify release branch matches package.json version
         if: startsWith(github.ref_name, 'release/')
@@ -50,5 +54,9 @@ jobs:
           npm pack --json > pack-result.json
           node scripts/verify-package.mjs
 
-      - name: Publish verified artifact
-        run: npm publish "$(node -p "Object.values(require('./pack-result.json'))[0].filename")" --access public --provenance --registry=https://registry.npmjs.org/
+      - name: Validate native npm publisher contracts
+        shell: pwsh
+        run: ./scripts/Test-NpmPublisher.ps1 -WorkDirectory (Join-Path $env:RUNNER_TEMP 'npm-publisher-contracts')
+      - name: Publish verified artifact with native OIDC
+        shell: pwsh
+        run: ./scripts/Publish-Npm.ps1 -PackResultPath ./pack-result.json

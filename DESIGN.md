@@ -98,9 +98,28 @@ not a general secret scanner. Publication uses that same verified tarball rather
 than repacking the working tree, keeping the inspected and published artifact
 identical.
 
+The workflow checks out the exact release commit with native git and a temporary
+HTTP authorization header. `scripts/Initialize-NodeBuild.ps1` installs the official
+Node 26.13.0 archive after verifying SHASUMS256, then prepares npm 12.2.1 for build
+and packaging. Checkout and toolchain setup do not use Node-based Actions.
+
 Publication uses npm Trusted Publishing through GitHub OIDC, with
-`id-token: write`, an explicitly installed OIDC-capable npm CLI, and public
-publication with provenance to the npm registry. The npm package's trusted
+`id-token: write`, native C#/.NET registry requests, and public
+publication with provenance to the npm registry. The thin `scripts/Publish-Npm.ps1`
+entry point uses PowerShell 7.4+ `Add-Type` to compile `scripts/NpmPublisher.cs`
+in memory; Node.js, npm CLI, .NET SDK and NuGet are not needed for publication. It checks
+the verified archive SHA-512, exchanges GitHub OIDC for a package-specific token,
+and signs the npm SLSA v1 statement with native cosign 3.0.4. The cosign binary
+is checked against a fixed SHA-256 and its upstream Sigstore signature before use.
+The signed subject, archive digest, workflow identity, and GitHub issuer are checked
+before uploading the archive and provenance together. Identical published versions
+are skipped only when registry metadata also advertises SLSA v1 provenance at an
+npm registry attestation URL. The same check applies after PUT; missing or malformed
+metadata fails without retrying PUT. This metadata check does not cryptographically
+reverify the registry's stored bundle. Different archive bytes for the same version
+stop publication. Source-hash-specific C# namespaces prevent the PowerShell entry
+point from silently reusing a different source version loaded earlier.
+The npm package's trusted
 publisher configuration is an external prerequisite; no long-lived npm token
 is supplied by the workflow. Checkout does not persist Git credentials, and
 the workflow has read-only repository content permissions. This separates
