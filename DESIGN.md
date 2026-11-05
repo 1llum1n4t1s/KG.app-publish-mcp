@@ -25,7 +25,7 @@ plus `app-publish://config` and `app-publish://supported-platforms` resources.
 
 ## Runtime data flow
 
-1. An MCP host starts `app-publish-mcp` (normally through `npx`) and communicates
+1. An MCP host starts `app-publish-mcp` (through `npx` or `bunx --bun`) and communicates
    with it over stdin/stdout.
 2. Module initialization reads package metadata and credential-related environment
    variables, then creates the available platform clients.
@@ -88,20 +88,17 @@ dispatch. On a release branch it checks the branch suffix against the package
 version, then installs the lockfile dependencies and builds before packaging.
 Manual dispatch on other branches does not run that version-name check.
 
-The workflow runs `npm pack --json` and passes its result to
-`scripts/verify-package.mjs`. The verifier checks the package name and version
-against the pack result and archived manifest, verifies version consistency
-with the lockfile and server metadata, requires the CLI and platform client entry
-files plus the license and README, and rejects test/dependency directories and
-selected credential filenames and key extensions. These are artifact checks,
-not a general secret scanner. Publication uses that same verified tarball rather
-than repacking the working tree, keeping the inspected and published artifact
-identical.
+The workflow runs `bun pm pack` and passes the tarball to
+`scripts/verify-bun-package.ps1`. The verifier checks archived entry types,
+names, duplicates, expected file bytes, the CLI executable mode, manifest
+fields, version consistency and the archive SHA-512. Publication uses that same
+verified tarball rather than repacking the working tree.
 
 The workflow checks out the exact release commit with native git and a temporary
-HTTP authorization header. `scripts/Initialize-NodeBuild.ps1` installs the official
-Node 26.13.0 archive after verifying SHASUMS256, then prepares npm 12.2.1 for build
-and packaging. Checkout and toolchain setup do not use Node-based Actions.
+HTTP authorization header. The workflow downloads the official Bun 1.4.4 Linux
+archive and checks its pinned SHA-256 before installation. Checkout and
+toolchain setup do not use Node-based Actions. The npm lockfile remains the
+dependency source; Bun migrates it in memory during installation.
 
 Publication uses npm Trusted Publishing through GitHub OIDC, with
 `id-token: write`, native C#/.NET registry requests, and public

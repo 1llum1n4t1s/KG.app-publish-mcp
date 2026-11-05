@@ -29,34 +29,47 @@ jobs:
           git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" fetch --no-tags --depth=1 origin "$GITHUB_SHA"
           git checkout --detach FETCH_HEAD
 
-      - name: Prepare native Node build toolchain
-        shell: pwsh
-        run: ./scripts/Initialize-NodeBuild.ps1 -Version '26.13.0' -NpmVersion '12.2.1'
+      - name: Prepare Bun build toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --output "$RUNNER_TEMP/bun.zip" https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-linux-x64-baseline.zip
+          echo 'e0446eb55995772eb9894bebae9a6be368d985a8b9271ee124486f9946eedd76  '"$RUNNER_TEMP/bun.zip" | sha256sum --check
+          unzip -q "$RUNNER_TEMP/bun.zip" -d "$RUNNER_TEMP/bun"
+          echo "$RUNNER_TEMP/bun/bun-linux-x64-baseline" >> "$GITHUB_PATH"
 
       - name: Verify release branch matches package.json version
         if: startsWith(github.ref_name, 'release/')
         run: |
           BR="${GITHUB_REF_NAME#release/}"
-          PKG=$(node -p "require('./package.json').version")
+          PKG=$(bun -p "require('./package.json').version")
           if [ "$BR" != "$PKG" ]; then
             echo "::error::Release branch '$BR' does not match package.json version '$PKG'"
             exit 1
           fi
 
       - name: Install dependencies
-        run: npm ci
+        run: bun install --frozen-lockfile
 
       - name: Build
-        run: npm run build
+        run: bun --bun run build
 
       - name: Package and verify publication artifact
+        id: package
+        shell: pwsh
         run: |
-          npm pack --json > pack-result.json
-          node scripts/verify-package.mjs
+          $archive = bun pm pack --quiet
+          if ($LASTEXITCODE -ne 0) { throw 'Bun pack failed' }
+          $verified = ./scripts/verify-bun-package.ps1 -PackageFile $archive
+          "file=$($verified.PackageFile)" >> $env:GITHUB_OUTPUT
+          "integrity=$($verified.Integrity)" >> $env:GITHUB_OUTPUT
 
       - name: Validate native npm publisher contracts
         shell: pwsh
         run: ./scripts/Test-NpmPublisher.ps1 -WorkDirectory (Join-Path $env:RUNNER_TEMP 'npm-publisher-contracts')
       - name: Publish verified artifact with native OIDC
         shell: pwsh
-        run: ./scripts/Publish-Npm.ps1 -PackResultPath ./pack-result.json
+        env:
+          PACKAGE_FILE: ${{ steps.package.outputs.file }}
+          PACKAGE_INTEGRITY: ${{ steps.package.outputs.integrity }}
+        run: ./scripts/Publish-Npm.ps1 -PackageFile $env:PACKAGE_FILE -ExpectedIntegrity $env:PACKAGE_INTEGRITY

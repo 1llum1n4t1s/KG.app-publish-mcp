@@ -13,7 +13,7 @@ import { OAuth2Client } from 'google-auth-library';
 import { createServer } from 'http';
 import { execFile } from 'child_process';
 import { randomBytes } from 'crypto';
-import { readFileSync, writeFileSync, mkdirSync } from 'fs';
+import fs, { writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 
@@ -61,7 +61,7 @@ export function parseSavedGoogleToken(raw: string): TokenStore | null {
 
 export function loadSavedGoogleToken(): TokenStore | null {
   try {
-    return parseSavedGoogleToken(readFileSync(GOOGLE_TOKEN_PATH, 'utf-8'));
+    return parseSavedGoogleToken(fs.readFileSync(GOOGLE_TOKEN_PATH, 'utf-8'));
   } catch {
     return null;
   }
@@ -179,7 +179,9 @@ export function waitForOAuthCode(
     };
 
     server.once('error', err => {
-      finish(new Error(`OAuth callback server failed: ${err.message}`, { cause: err }));
+      const code = (err as NodeJS.ErrnoException).code;
+      const detail = code === 'EADDRINUSE' && !err.message.includes(code) ? `${code}: ${err.message}` : err.message;
+      finish(new Error(`OAuth callback server failed: ${detail}`, { cause: err }));
     });
 
     timer = setTimeout(() => {

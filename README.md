@@ -94,6 +94,15 @@ Use this MCP when you need to:
 
 No local clone or installation is required. The MCP client configuration below runs the latest npm release with `npx`.
 
+To run with Bun instead of Node.js, use `bunx --bun` and the same package name:
+
+```sh
+bunx --bun @kagayoi/app-publish-mcp@latest
+```
+
+In an MCP client configuration, use `bunx` as the command and
+`["--bun", "@kagayoi/app-publish-mcp@latest"]` as its arguments.
+
 ### 2. Apple Credentials
 
 1. Go to [App Store Connect > Keys](https://appstoreconnect.apple.com/access/integrations/api)
@@ -119,6 +128,8 @@ omit the other platform's credential variables.
 ```sh
 npx --yes @kagayoi/app-publish-mcp@latest auth google
 ```
+
+With Bun, run `bunx --bun @kagayoi/app-publish-mcp@latest auth google` instead.
 
 Complete the browser sign-in on the same computer. The command listens on
 `127.0.0.1:19847` and saves credentials to `~/.app-publish-mcp/google.json`.

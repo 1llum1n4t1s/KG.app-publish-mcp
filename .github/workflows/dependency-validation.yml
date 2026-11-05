@@ -40,3 +40,169 @@ jobs:
         run: npm test
       - name: Validate 3
         run: npm run test:stdio
+      - name: Prepare verified Bun pack toolchain
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/bun.zip"
+          curl --fail --location --retry 3 --output "$archive" https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-linux-x64-baseline.zip
+          echo 'e0446eb55995772eb9894bebae9a6be368d985a8b9271ee124486f9946eedd76  '"$archive" | sha256sum --check
+          unzip -q "$archive" -d "$RUNNER_TEMP/bun"
+          echo "$RUNNER_TEMP/bun/bun-linux-x64-baseline" >> "$GITHUB_PATH"
+      - name: Build release artifact with Bun
+        run: bun --bun run build
+      - name: Prepare packaged Node compatibility fixture
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/app-node22"
+          mkdir -p "$root"
+          archive=$(bun pm pack --quiet --destination "$root")
+          [[ "$archive" = /* ]] || archive="$root/$archive"
+          tar -xzf "$archive" -C "$root"
+          mkdir -p "$root/package/test/fixtures" "$root/home"
+          cp test/fixtures/apple-review.mjs "$root/package/test/fixtures/"
+          ln -s "$GITHUB_WORKSPACE/node_modules" "$root/package/node_modules"
+      - name: Prepare minimum supported Node runtime
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22.0.0'
+      - name: Validate packaged Node 22 stdio compatibility
+        run: |
+          node --input-type=module - <<'NODE'
+          import assert from 'node:assert/strict';
+          import { readFileSync, realpathSync } from 'node:fs';
+          import { spawn } from 'node:child_process';
+          import { createServer } from 'node:net';
+          import { basename, join } from 'node:path';
+          import { pathToFileURL } from 'node:url';
+          import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+          import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+          if (process.versions.bun || process.versions.node !== '22.0.0' || basename(realpathSync(process.execPath)) !== (process.platform === 'win32' ? 'node.exe' : 'node')) {
+            throw new Error('Expected the real Node 22.0.0 runtime');
+          }
+          const root = join(process.env.RUNNER_TEMP, 'app-node22', 'package');
+          function compareDocumentedTools(markdown, actual) {
+            const expected = [];
+            let inFeatures = false;
+            let inTable = false;
+            let tables = 0;
+            let fence = null;
+            for (const line of markdown.split(/\r?\n/)) {
+              const marker = line.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
+              if (fence) {
+                if (marker && marker[1][0] === fence[0] && marker[1].length >= fence.length && /^\s*$/.test(marker[2])) fence = null;
+                continue;
+              }
+              if (marker) { fence = marker[1]; inTable = false; continue; }
+              if (/^ {0,3}##(?:[ \t]+|$)/.test(line)) {
+                if (inFeatures) break;
+                if (/^ {0,3}##[ \t]+Features[ \t]*#*[ \t]*$/.test(line)) inFeatures = true;
+                continue;
+              }
+              if (!inFeatures) continue;
+              if (/^\|\s*Category\s*\|\s*Tools\s*\|\s*$/.test(line)) { inTable = true; tables++; continue; }
+              if (!inTable) continue;
+              if (!line.startsWith('|')) { inTable = false; continue; }
+              if (/^\|[\s:-]+\|[\s:-]+\|\s*$/.test(line)) continue;
+              const cells = line.split('|');
+              assert.equal(cells.length, 4, 'Invalid tools table row');
+              const names = cells[2].trim();
+              assert.match(names, /^`[A-Za-z0-9_.-]+`(?:,\s*`[A-Za-z0-9_.-]+`)*$/, 'Invalid tool name list');
+              expected.push(...[...names.matchAll(/`([^`]+)`/g)].map(match => match[1]));
+            }
+            assert.ok(tables && expected.length, 'README has no documented tools');
+            assert.equal(new Set(expected).size, expected.length, 'Duplicate documented tool');
+            assert.equal(new Set(actual).size, actual.length, 'Duplicate discovered tool');
+            assert.deepEqual([...actual].sort(), [...expected].sort(), 'Discovered tools differ from README');
+          }
+          const sample = '## Features\n| Category | Tools |\n|---|---|\n| Example | `apple_one`, `google_two` |\n## Setup\n';
+          compareDocumentedTools(sample, ['google_two', 'apple_one']);
+          compareDocumentedTools(sample.replace('## Setup', '## Installation'), ['apple_one', 'google_two']);
+          compareDocumentedTools(sample.replace('## Setup', '##') + '| Category | Tools |\n|---|---|\n| Other | `unrelated_tool` |\n', ['apple_one', 'google_two']);
+          compareDocumentedTools(sample.replace('## Setup\n', ''), ['apple_one', 'google_two']);
+          compareDocumentedTools(sample + '## Other\n| Category | Tools |\n|---|---|\n| Other | `unrelated_tool` |\n', ['apple_one', 'google_two']);
+          const fenced = ['```md', '## Features', '| Category | Tools |', '|---|---|', '| Fake | `wrong_before` |', '```',
+            '## Features', '```md', '## Fake heading', '| Category | Tools |', '|---|---|', '| Fake | `wrong_backtick` |', '```',
+            '~~~md', '## Another fake heading', '| Category | Tools |', '|---|---|', '| Fake | `wrong_tilde` |', '~~~',
+            '| Category | Tools |', '|---|---|', '| Real | `apple_one`, `google_two` |', '## Other',
+            '| Category | Tools |', '|---|---|', '| Fake | `wrong_after` |'].join('\n');
+          compareDocumentedTools(fenced, ['apple_one', 'google_two']);
+          compareDocumentedTools(sample.replace('`google_two`', '`google_two`, `apple_new`'), ['apple_new', 'apple_one', 'google_two']);
+          compareDocumentedTools(sample.replace('`google_two`', '`google_two`, `0start`, `Tool.Name-1`, `_under`'), ['google_two', 'apple_one', '0start', 'Tool.Name-1', '_under']);
+          assert.throws(() => compareDocumentedTools(sample, ['apple_one']));
+          assert.throws(() => compareDocumentedTools(sample, ['apple_one', 'google_two', 'extra_tool']));
+          assert.throws(() => compareDocumentedTools(sample.replace('`google_two`', '`apple_one`'), ['apple_one']));
+          assert.throws(() => compareDocumentedTools(sample, ['apple_one', 'google_two', 'apple_one']));
+          const guard = `import { realpathSync } from 'node:fs';
+            import net from 'node:net';
+            import { syncBuiltinESMExports } from 'node:module';
+            if (process.versions.bun || process.versions.node !== '22.0.0' || realpathSync(process.execPath) !== process.env.EXPECTED_NODE_EXEC) throw new Error('Unexpected child runtime');
+            net.Socket.prototype.connect = function () { throw new Error('Unexpected network access'); };
+            syncBuiltinESMExports();
+            globalThis.fetch = () => { throw new Error('Unexpected network access'); };`;
+          const guardUrl = `data:text/javascript,${encodeURIComponent(guard)}`;
+          let received = 0;
+          const listener = createServer(socket => { received++; socket.destroy(); });
+          await new Promise((resolve, reject) => { listener.once('error', reject); listener.listen(0, '127.0.0.1', resolve); });
+          try {
+            const probe = `import assert from 'node:assert/strict';
+              import http from 'node:http'; import https from 'node:https'; import net from 'node:net'; import tls from 'node:tls';
+              const port = Number(process.env.PROBE_PORT), url = 'http://127.0.0.1:' + port;
+              async function refused(name, action) {
+                try {
+                  const result = action();
+                  if (result && typeof result.then === 'function') await result;
+                  else await new Promise((resolve, reject) => { const timer = setTimeout(() => reject(new Error(name + ' timed out')), 5000); result.once('error', error => { clearTimeout(timer); reject(error); }); });
+                  throw new Error(name + ' unexpectedly connected');
+                } catch (error) { assert.match(String(error), /Unexpected network access/, name); }
+              }
+              await refused('fetch', () => fetch(url));
+              await refused('http', () => http.get(url));
+              await refused('https', () => https.get('https://127.0.0.1:' + port));
+              await refused('net', () => net.connect({ host: '127.0.0.1', port }));
+              await refused('tls', () => tls.connect({ host: '127.0.0.1', port }));`;
+            const child = spawn(process.execPath, ['--import', guardUrl, '--input-type=module', '-e', probe], {
+              env: { PATH: process.env.PATH, SystemRoot: process.env.SystemRoot, TEMP: process.env.RUNNER_TEMP, TMP: process.env.RUNNER_TEMP,
+                HOME: join(process.env.RUNNER_TEMP, 'app-node22', 'home'), USERPROFILE: join(process.env.RUNNER_TEMP, 'app-node22', 'home'),
+                EXPECTED_NODE_EXEC: realpathSync(process.execPath), PROBE_PORT: String(listener.address().port), NODE_OPTIONS: '', NODE_PATH: '' },
+              stdio: ['ignore', 'pipe', 'pipe'],
+            });
+            let stderr = '';
+            child.stderr.on('data', data => { stderr += data; });
+            const code = await new Promise((resolve, reject) => { child.once('error', reject); child.once('exit', resolve); });
+            assert.equal(code, 0, stderr);
+            assert.equal(received, 0, 'Network guard permitted a connection');
+            console.log('fetch, http, https, net and tls were rejected; listener received no connections');
+          } finally {
+            await new Promise((resolve, reject) => listener.close(error => error ? reject(error) : resolve()));
+          }
+          const transport = new StdioClientTransport({
+            command: process.execPath,
+            args: ['--import', guardUrl,
+              '--import', pathToFileURL(join(root, 'test/fixtures/apple-review.mjs')).href,
+              join(root, 'dist/cli.js')],
+            env: { EXPECTED_NODE_EXEC: realpathSync(process.execPath), NODE_OPTIONS: '', NODE_PATH: '',
+              HOME: join(process.env.RUNNER_TEMP, 'app-node22', 'home'),
+              USERPROFILE: join(process.env.RUNNER_TEMP, 'app-node22', 'home'),
+              APPLE_KEY_ID: 'fixture', APPLE_ISSUER_ID: 'fixture', APPLE_P8_PATH: 'unused-fixture-key',
+              GOOGLE_SERVICE_ACCOUNT_PATH: '', GOOGLE_CLIENT_ID: '', GOOGLE_CLIENT_SECRET: '', GOOGLE_REFRESH_TOKEN: '',
+              REVIEW_FIXTURE_LOST_RESPONSE: '0' },
+            stderr: 'pipe',
+          });
+          const client = new Client({ name: 'node22-package-validation', version: '1.0.0' });
+          const timeout = setTimeout(() => { console.error('Node 22 MCP validation timed out'); process.exit(1); }, 30000);
+          try {
+            await client.connect(transport);
+            const { tools } = await client.listTools();
+            compareDocumentedTools(readFileSync(join(root, 'README.md'), 'utf8'), tools.map(tool => tool.name));
+            assert.ok(tools.find(tool => tool.name === 'apple_submit_for_review')?.inputSchema.properties?.submissionId);
+            const result = await client.callTool({ name: 'apple_submit_for_review', arguments: {
+              appId: 'app', versionId: 'version', platform: 'IOS', submissionId: 'draft',
+            } });
+            assert.notEqual(result.isError, true);
+            assert.match(result.content.map(item => item.text ?? '').join('\n'), /WAITING_FOR_REVIEW/);
+            console.log(`Node 22 packaged MCP initialized with ${tools.length} tools and handled the review fixture`);
+          } finally {
+            await client.close();
+            clearTimeout(timeout);
+          }
+          NODE

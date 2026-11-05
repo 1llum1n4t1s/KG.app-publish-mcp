@@ -21,7 +21,8 @@ This repository provides the `@kagayoi/app-publish-mcp` stdio MCP server. Read
 - Use the committed `package-lock.json` with npm and preserve compatibility with
   the `package.json` engine requirement (`node >=22`). Source is strict ESM
   TypeScript; generated `dist/` files remain untracked.
-  Development, publication, and dependency CI use Node 26.13.0 and npm 12.2.1.
+  The Node compatibility path and dependency CI use Node 26.13.0 and npm 12.2.1;
+  the publication workflow builds and packs with Bun 1.4.4.
 - Keep MCP stdout reserved for protocol traffic. Send startup and diagnostic
   messages to stderr.
 - Add platform operations as `ToolDef` entries and include them in the matching
@@ -59,6 +60,10 @@ PATH and the pack result and tarball in the repository root. Publish only the
 verified tarball, as the [publication workflow](.github/workflows/npm-publish.yml)
 does; the artifact checks and rationale are described in
 [DESIGN.md](DESIGN.md#package-publication-boundary).
+
+The release workflow packs with Bun and validates the resulting tarball using
+`scripts/verify-bun-package.ps1`. The npm pack verifier remains available for
+checking the Node/npm compatibility path.
 
 For runtime or protocol changes, add or update automated coverage, initialize the
 built stdio server with an MCP client, and exercise the affected tool path against

@@ -4,11 +4,16 @@ import { test } from 'node:test';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
+const preload = path => {
+  const url = new URL(path, import.meta.url);
+  return process.versions.bun ? fileURLToPath(url) : url.href;
+};
+
 for (const lostResponse of [false, true]) {
   test(`ビルド済みstdio: 4項目の提出と再実行（応答喪失=${lostResponse}）`, { timeout: 30_000 }, async () => {
     const transport = new StdioClientTransport({
       command: process.execPath,
-      args: ['--import', new URL('./fixtures/apple-review.mjs', import.meta.url).href,
+      args: ['--import', preload('./fixtures/apple-review.mjs'),
         fileURLToPath(new URL('../dist/cli.js', import.meta.url))],
       env: {
         APPLE_KEY_ID: 'fixture', APPLE_ISSUER_ID: 'fixture', APPLE_P8_PATH: 'unused-fixture-key',
@@ -57,7 +62,7 @@ for (const lostResponse of [false, true]) {
 test('ビルド済みstdio: 同一snapshotの分割uploadと両Google価格経路', { timeout: 30_000 }, async () => {
   const transport = new StdioClientTransport({
     command: process.execPath,
-    args: ['--import', new URL('./fixtures/upload-pricing.mjs', import.meta.url).href,
+    args: ['--import', preload('./fixtures/upload-pricing.mjs'),
       fileURLToPath(new URL('../dist/cli.js', import.meta.url))],
     env: {
       APPLE_KEY_ID: 'fixture', APPLE_ISSUER_ID: 'fixture', APPLE_P8_PATH: 'unused-fixture-key',
@@ -101,6 +106,8 @@ test('ビルド済みstdio: 同一snapshotの分割uploadと両Google価格経�
       purchaseOptions: [{ purchaseOptionId: 'buy', buy: {}, regionalConfigs }],
     });
     assert.deepEqual(oneTime.purchaseOptions[0].regionalPricingAndAvailabilityConfigs.map(region => region.price), expected);
+  } catch (error) {
+    throw new Error(`${error.message}\n${stderr}`, { cause: error });
   } finally {
     await client.close();
     await transport.close();

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { createHash } from 'crypto';
-import { readFileSync } from 'fs';
+import fs from 'fs';
 import { AppleApiError, AppleClient } from './client.js';
 
 // Helper to define a tool
@@ -316,7 +316,7 @@ const uploadScreenshot: ToolDef = {
   handler: async (client, args) => {
     // Read the asset once: its byte length seeds the reservation and its MD5 is
     // required to commit (App Store Connect never fills sourceFileChecksum for us).
-    const fileBytes = readFileSync(args.filePath);
+    const fileBytes = fs.readFileSync(args.filePath);
     const sourceFileChecksum = createHash('md5').update(fileBytes).digest('hex');
 
     if (args.fileSize !== undefined && args.fileSize !== fileBytes.length) {

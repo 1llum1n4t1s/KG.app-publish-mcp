@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import { readFileSync } from 'fs';
+import fs from 'fs';
 
 const APPLE_API_TIMEOUT_MS = 60_000;
 const APPLE_UPLOAD_TIMEOUT_MS = 10 * 60_000;
@@ -38,7 +38,7 @@ export class AppleClient {
     const now = Math.floor(Date.now() / 1000);
     if (this.token && now < this.tokenExp - 60) return this.token;
 
-    const privateKey = readFileSync(this.config.p8Path, 'utf8');
+    const privateKey = fs.readFileSync(this.config.p8Path, 'utf8');
     const payload = {
       iss: this.config.issuerId,
       iat: now,
@@ -95,7 +95,7 @@ export class AppleClient {
   }
 
   async upload(url: string, filePath: string, contentType: string): Promise<any> {
-    const data = readFileSync(filePath);
+    const data = fs.readFileSync(filePath);
     const res = await fetch(url, {
       method: 'PUT',
       headers: {
@@ -127,7 +127,7 @@ export class AppleClient {
     if (!operation.url || !operation.method) {
       throw new Error('Apple upload operation missing url or method');
     }
-    const fullBytes = typeof source === 'string' ? readFileSync(source) : source;
+    const fullBytes = typeof source === 'string' ? fs.readFileSync(source) : source;
     const start = operation.offset ?? 0;
     const len = operation.length ?? fullBytes.length - start;
     const slice = fullBytes.subarray(start, start + len);
