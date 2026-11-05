@@ -35,11 +35,11 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
       - name: Validate 1
-        run: npm run lint
+        run: node node_modules/typescript/bin/tsc --noEmit
       - name: Validate 2
-        run: npm test
+        run: npm run test:node
       - name: Validate 3
-        run: npm run test:stdio
+        run: npm run test:stdio:node
       - name: Prepare verified Bun pack toolchain
         run: |
           set -euo pipefail

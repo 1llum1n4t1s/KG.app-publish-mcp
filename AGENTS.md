@@ -11,14 +11,14 @@ This repository provides the `@kagayoi/app-publish-mcp` stdio MCP server. Read
 - `src/apple/` and `src/google/` contain platform clients and declarative tool
   registries. Keep API transport details in `client.ts` and MCP schemas/handlers
   in `tools.ts`.
-- `test/` contains the automated Node test-runner coverage for tool contracts,
+- `test/` contains automated Bun and Node compatibility coverage for tool contracts,
   authentication, error handling, and platform client behavior.
 - `server.json`, `smithery.yaml`, `glama.json`, and `llms.txt` describe the
   published server. `.github/workflows/npm-publish.yml` is the npm release path.
 
 ## Development rules
 
-- Use the committed `package-lock.json` with npm and preserve compatibility with
+- Use Bun with the committed `package-lock.json` and preserve compatibility with
   the `package.json` engine requirement (`node >=22`). Source is strict ESM
   TypeScript; generated `dist/` files remain untracked.
   The Node compatibility path and dependency CI use Node 26.13.0 and npm 12.2.1;
@@ -45,14 +45,17 @@ This repository provides the `@kagayoi/app-publish-mcp` stdio MCP server. Read
 Run from the repository root:
 
 ```powershell
-npm ci
-npm run lint
-npm test
-npm run build
-npm run test:stdio
-npm pack --dry-run
+bun install --frozen-lockfile --no-save
+bun --no-env-file --no-install --bun run lint
+bun --no-env-file --no-install run test
+bun --no-env-file --no-install --bun run build
+bun --no-env-file --no-install run test:stdio
 git diff --check
 ```
+
+Default start, development and test scripts use Bun. Preserve the public Node.js
+CLI contract; dependency CI runs `npm run test:node` and `npm run test:stdio:node`
+with the actual Node runtime for compatibility coverage.
 
 For release validation, also run `npm pack --json > pack-result.json` followed by
 `node scripts/verify-package.mjs` after building. The verifier requires `tar` on
