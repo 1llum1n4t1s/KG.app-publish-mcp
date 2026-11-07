@@ -1,6 +1,6 @@
 #requires -Version 7.4
 <#
-Publishes an already verified npm archive using NODE_AUTH_TOKEN (or NPM_TOKEN), without provenance.
+Publishes an already verified npm archive using GitHub OIDC and native cosign.
 The protocol implementation is NpmPublisher.cs, compiled in memory by PowerShell.
 PrepareOnly performs no network requests and returns the unsigned publication inputs.
 No Node.js, npm CLI, .NET SDK or NuGet packages are required for publication.

@@ -37,8 +37,9 @@ This repository provides the `@kagayoi/app-publish-mcp` stdio MCP server. Read
   published metadata in the same change. Keep README content user-focused.
 - Keep `package.json`, `package-lock.json`, `server.json`, and release branch
   versions synchronized for a release. The publish workflow requires
-  `release/<version>` to match `package.json` and publishes using the NPM_TOKEN
-  repository secret, passed as NODE_AUTH_TOKEN, without provenance on self-hosted runners.
+  `release/<version>` to match `package.json` and publishes using GitHub OIDC Trusted Publishing. The publication workflow runs install, build, pack, verification and OIDC publication
+  on GitHub-hosted ubuntu-latest to meet npm provenance requirements. Normal
+  dependency validation remains on M3 Linux ARM64.
 
 ## Required validation
 
@@ -81,7 +82,7 @@ boundaries described in [DESIGN.md](DESIGN.md#apple-review-submission).
 
 For publisher changes, also run `pwsh -NoProfile -File scripts/Test-NpmPublisher.ps1 -WorkDirectory <dedicated-absolute-work-path>`.
 The C# publisher is compiled in memory by PowerShell 7.4+ without a .NET SDK or
-npm publication runtime. Tests use fixture tarballs, mocked HTTP and a
+npm publication runtime. Tests use fixture tarballs, mocked HTTP/cosign and a
 localhost redirect check without live credentials. Use an empty work directory
 and clean its fixture files afterwards. Only a 404 version lookup permits a new
 publication attempt; unknown PUT results must not be retried automatically.

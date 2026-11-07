@@ -100,21 +100,20 @@ archive and checks its pinned SHA-256 before installation. Checkout and
 toolchain setup do not use Node-based Actions. The npm lockfile remains the
 dependency source; Bun migrates it in memory during installation.
 
-Publication uses native C#/.NET registry requests via the PowerShell 7.4+ Add-Type
-entry point scripts/Publish-Npm.ps1. No Node/npm, .NET SDK or NuGet is required.
-The self-hosted Linux workflow supplies secrets.NPM_TOKEN as NODE_AUTH_TOKEN only
-to the publication step. Direct calls may use NPM_TOKEN as fallback. The token
-must grant package publication. OIDC exchange, cosign and provenance generation
-are removed because npm does not support trusted publishing/provenance on
-self-hosted runners. The archive SHA-512 and release version are verified, and
-the file digest is rechecked immediately before PUT. Existing versions require
-identical registry integrity. Missing attestations are accepted; old provenance
-metadata, when present, must retain the SLSA v1 type and package-specific npm URL.
-This metadata check does not cryptographically reverify old bundles. Only a
-pre-publication 404 permits PUT. After PUT, the registry integrity and any present provenance metadata are
-confirmed. Rejection and unknown outcomes fail without retrying PUT. Source-hash-specific namespaces
-preserve PowerShell source reload isolation. Checkout credentials are not
-persisted and repository content permissions remain read-only.
+Publication keeps npm Trusted Publishing (GitHub OIDC). The npm-publish.yml
+workflow runs install, build, pack, verification and publication on GitHub-hosted
+ubuntu-latest to meet the cloud-hosted build requirement for npm provenance.
+Normal dependency validation remains on M3MB14 Linux ARM64. The verified
+SHA-512 and manifest are checked before publishing the same archive without
+repacking. No saved npm publication token is used.
+The native C# publisher exchanges GitHub OIDC for a package-specific short-lived
+token and signs SLSA v1 provenance with cosign 3.0.4. Its fixed binary hash,
+upstream signature, signed subject, workflow identity, issuer and archive digest
+are checked before upload. Existing versions require identical integrity and
+valid npm registry provenance metadata. After PUT succeeds, the registry integrity and provenance metadata are checked
+again. Unknown outcomes fail without retrying PUT. Source-hash-specific namespaces preserve
+the PowerShell source reload boundary. The workflow filename and existing release/manual conditions remain unchanged,
+so the existing npm Trusted Publisher registration stays applicable.
 
 Release validation commands and version synchronization requirements are defined
 in [`AGENTS.md`](AGENTS.md); the publish workflow itself runs dependency

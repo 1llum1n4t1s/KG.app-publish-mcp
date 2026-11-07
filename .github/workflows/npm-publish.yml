@@ -1,6 +1,6 @@
 name: Publish to npm
 
-# 公開は native C# / .NET（PowerShell入口）と NPM_TOKEN secret を使い、provenanceは付けない。
+# 公開は native C# / .NET / cosign（PowerShell入口）と npm Trusted Publishing の OIDC 認証を使う。
 # 発火: release/x.y.z ブランチの push、または手動実行。
 
 on:
@@ -11,10 +11,11 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   publish:
-    runs-on: [self-hosted, Linux, ARM64, m3mb14]
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout release commit with native git
         shell: bash
@@ -32,10 +33,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl --fail --location --retry 3 --output "$RUNNER_TEMP/bun.zip" https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-linux-aarch64.zip
-          echo 'baa6bb36f51d6e58561e02bbea825038a9df454f673d6d776e8bbf86f8c7850e  '"$RUNNER_TEMP/bun.zip" | sha256sum --check
+          curl --fail --location --retry 3 --output "$RUNNER_TEMP/bun.zip" https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-linux-x64-baseline.zip
+          echo 'e0446eb55995772eb9894bebae9a6be368d985a8b9271ee124486f9946eedd76  '"$RUNNER_TEMP/bun.zip" | sha256sum --check
           unzip -q "$RUNNER_TEMP/bun.zip" -d "$RUNNER_TEMP/bun"
-          echo "$RUNNER_TEMP/bun/bun-linux-aarch64" >> "$GITHUB_PATH"
+          echo "$RUNNER_TEMP/bun/bun-linux-x64-baseline" >> "$GITHUB_PATH"
 
       - name: Verify release branch matches package.json version
         if: startsWith(github.ref_name, 'release/')
@@ -66,10 +67,9 @@ jobs:
       - name: Validate native npm publisher contracts
         shell: pwsh
         run: ./scripts/Test-NpmPublisher.ps1 -WorkDirectory (Join-Path $env:RUNNER_TEMP 'npm-publisher-contracts')
-      - name: Publish verified artifact with native token authentication
+      - name: Publish verified artifact with native OIDC
         shell: pwsh
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           PACKAGE_FILE: ${{ steps.package.outputs.file }}
           PACKAGE_INTEGRITY: ${{ steps.package.outputs.integrity }}
         run: ./scripts/Publish-Npm.ps1 -PackageFile $env:PACKAGE_FILE -ExpectedIntegrity $env:PACKAGE_INTEGRITY
