@@ -9,7 +9,7 @@ try {
 $networkGuard.Verify()
 [Kagayoi.Npm.ContractTests]::Run([IO.Path]::GetFullPath($WorkDirectory))
 
-# 現役PowerShell入口も、合成したprovenance入力で確認する。元の環境は必ず戻す。
+# 現役PowerShell入口も、fixtureアーカイブで確認する。元の環境は必ず戻す。
 $context = @{
     GITHUB_SERVER_URL = 'https://github.com'; GITHUB_REPOSITORY = 'fixture/package'
     GITHUB_WORKFLOW_REF = 'fixture/package/.github/workflows/publish.yml@refs/heads/release/1.2.3'
@@ -27,7 +27,7 @@ try {
     $file = Join-Path $WorkDirectory 'valid.tgz'
     $integrity = 'sha512-' + [Convert]::ToBase64String([Security.Cryptography.SHA512]::HashData([IO.File]::ReadAllBytes($file)))
     $result = & (Join-Path $PSScriptRoot 'Publish-Npm.ps1') -PackageFile $file -ExpectedIntegrity $integrity -PrepareOnly
-    if ($result.Metadata.name -cne '@fixture/package' -or $result.Statement.subject[0].digest.sha512 -cne (Get-FileHash -LiteralPath $file -Algorithm SHA512).Hash.ToLowerInvariant()) {
+    if ($result.Metadata.name -cne '@fixture/package' -or $result.Metadata.versions['1.2.3'].dist.integrity -cne $integrity) {
         throw 'PowerShell PrepareOnly entry contract failed'
     }
     $result = & (Join-Path $PSScriptRoot 'Publish-Npm.ps1') -PackResultPath (Join-Path $WorkDirectory 'pack-object.json') -PrepareOnly

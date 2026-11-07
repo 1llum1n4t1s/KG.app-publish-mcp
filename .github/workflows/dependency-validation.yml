@@ -10,8 +10,8 @@ permissions:
 
 jobs:
   validate:
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.user.login == 'dependabot[bot]'
-    runs-on: ubuntu-latest
+    if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && (github.event_name == 'workflow_dispatch' || github.event.pull_request.user.login == 'dependabot[bot]') }}
+    runs-on: [self-hosted, Linux, ARM64, m3mb14]
     timeout-minutes: 25
     strategy:
       matrix:
@@ -44,10 +44,10 @@ jobs:
         run: |
           set -euo pipefail
           archive="$RUNNER_TEMP/bun.zip"
-          curl --fail --location --retry 3 --output "$archive" https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-linux-x64-baseline.zip
-          echo 'e0446eb55995772eb9894bebae9a6be368d985a8b9271ee124486f9946eedd76  '"$archive" | sha256sum --check
+          curl --fail --location --retry 3 --output "$archive" https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-linux-aarch64.zip
+          echo 'baa6bb36f51d6e58561e02bbea825038a9df454f673d6d776e8bbf86f8c7850e  '"$archive" | sha256sum --check
           unzip -q "$archive" -d "$RUNNER_TEMP/bun"
-          echo "$RUNNER_TEMP/bun/bun-linux-x64-baseline" >> "$GITHUB_PATH"
+          echo "$RUNNER_TEMP/bun/bun-linux-aarch64" >> "$GITHUB_PATH"
       - name: Build release artifact with Bun
         run: bun --bun run build
       - name: Prepare packaged Node compatibility fixture
