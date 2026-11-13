@@ -39,7 +39,7 @@ This repository provides the `@kagayoi/app-publish-mcp` stdio MCP server. Read
   versions synchronized for a release. The publish workflow requires
   `release/<version>` to match `package.json` and publishes using GitHub OIDC Trusted Publishing. The publication workflow runs install, build, pack, verification and OIDC publication
   on GitHub-hosted ubuntu-latest to meet npm provenance requirements. Normal
-  dependency validation remains on M3 Linux ARM64.
+  dependency validation also runs on GitHub-hosted ubuntu-latest.
 
 ## Required validation
 

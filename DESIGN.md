@@ -103,7 +103,7 @@ dependency source; Bun migrates it in memory during installation.
 Publication keeps npm Trusted Publishing (GitHub OIDC). The npm-publish.yml
 workflow runs install, build, pack, verification and publication on GitHub-hosted
 ubuntu-latest to meet the cloud-hosted build requirement for npm provenance.
-Normal dependency validation remains on M3MB14 Linux ARM64. The verified
+Normal dependency validation also runs on GitHub-hosted ubuntu-latest. The verified
 SHA-512 and manifest are checked before publishing the same archive without
 repacking. No saved npm publication token is used.
 The native C# publisher exchanges GitHub OIDC for a package-specific short-lived
