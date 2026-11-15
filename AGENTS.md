@@ -14,7 +14,9 @@ This repository provides the `@kagayoi/app-publish-mcp` stdio MCP server. Read
 - `src/apple/` and `src/google/` contain platform clients and declarative tool
   registries. Keep API transport details in `client.ts` and MCP schemas/handlers
   in `tools.ts`. Both registries use the shared `ToolDef<C>` type from
-  `src/tool-def.ts`.
+  `src/tool-def.ts`. `src/apple/compact.ts` shapes Apple results (drops JSON:API
+  `links`, masks `demoAccountPassword`); `src/index.ts` applies it to every Apple
+  tool result and error text.
 - `test/` contains automated Bun coverage for tool contracts, authentication,
   error handling, and platform client behavior. `test/fixtures/` holds the
   review/upload fixtures and the Bun network guard (`network-guard.mjs`).
@@ -103,7 +105,9 @@ an appropriately authorized account or a safe fixture. `bun run test:stdio`
 rebuilds and tests Apple review submission and response-loss retries through an
 MCP client using `test/fixtures/apple-review.mjs`, without live credentials or
 network access. It also covers screenshot upload bytes, Google product pricing,
-and saved-token fallback using `test/fixtures/upload-pricing.mjs`.
+and saved-token fallback using `test/fixtures/upload-pricing.mjs`, plus Apple
+result compaction and password masking using `test/fixtures/apple-compact.mjs`
+and `test/fixtures/apple-redact.mjs`.
 It is separate from `bun run test`; extend coverage for other
 affected paths as needed. Preserve the submission ownership and failure
 boundaries described in [DESIGN.md](DESIGN.md#apple-review-submission).

@@ -16,6 +16,7 @@ independently according to the credentials available at process startup.
 | `src/tool-def.ts` | Declares the `ToolDef<C>` shape shared by both platform registries | Type only; no runtime code |
 | `src/apple/tools.ts` / `src/google/tools.ts` | Define Zod input schemas, tool names/descriptions, and operation handlers | Handlers depend on their platform client rather than transport or credentials |
 | `src/apple/client.ts` | Creates short-lived ES256 App Store Connect JWTs and performs Apple API requests/uploads | Reads the configured `.p8` file locally; does not own MCP formatting |
+| `src/apple/compact.ts` | Shapes Apple results before serialization: drops unusable JSON:API `links` and masks `demoAccountPassword` in results and error text | Pure functions; handlers still see raw responses, and Google results never pass through it |
 | `src/google/client.ts` | Configures the Android Publisher v3 client and implements Google API operations | Accepts a service account or OAuth refresh credentials |
 | `src/google/errors.ts` | Provides the not-configured message and formats Google API failures (HTTP status plus a selected subset of the response payload) | Pure helpers; no API calls |
 | `src/auth.ts` | Runs interactive Google OAuth through a localhost callback and stores the refresh credentials | Writes only to the per-user `~/.app-publish-mcp/google.json` store |
