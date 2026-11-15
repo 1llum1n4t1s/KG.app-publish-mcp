@@ -39,10 +39,13 @@ export class AppleClient {
     if (this.token && now < this.tokenExp - 60) return this.token;
 
     const privateKey = fs.readFileSync(this.config.p8Path, 'utf8');
+    // App Store Connect はトークン寿命の上限を20分としているが、ちょうど20分(exp = iat + 1200)は
+    // 401 NOT_AUTHORIZED で拒否される（2026-11-12 実測。19分は200）。時計のずれも考慮して上限未満の19分にする。
+    const lifetimeSeconds = 19 * 60;
     const payload = {
       iss: this.config.issuerId,
       iat: now,
-      exp: now + 20 * 60, // 20 minutes
+      exp: now + lifetimeSeconds,
       aud: 'appstoreconnect-v1',
     };
 
@@ -50,7 +53,7 @@ export class AppleClient {
       algorithm: 'ES256',
       header: { alg: 'ES256', kid: this.config.keyId, typ: 'JWT' },
     });
-    this.tokenExp = now + 20 * 60;
+    this.tokenExp = now + lifetimeSeconds;
     return this.token;
   }
 
