@@ -75,6 +75,8 @@
 
 로컬 clone이나 사전 설치가 필요하지 않습니다. 아래 MCP 클라이언트 설정이 `npx`로 npm 최신 버전을 실행합니다.
 
+이미 `@kagayoi/app-publish-mcp@1.0.5`처럼 버전을 고정해 등록했다면, 등록된 실행 인수를 `@kagayoi/app-publish-mcp@latest`로 바꾸세요. README를 바꿔도 기존 등록은 바뀌지 않지만, 한 번 바꾸면 이후에는 실행할 때마다 자동으로 최신 버전을 사용합니다.
+
 ### 2. Apple 자격증명
 
 1. [App Store Connect > Keys](https://appstoreconnect.apple.com/access/integrations/api)로 이동합니다

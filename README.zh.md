@@ -75,6 +75,8 @@
 
 无需本地克隆或预先安装。以下 MCP 客户端配置会通过 `npx` 运行 npm 上的最新版本。
 
+如果已经以固定版本（例如 `@kagayoi/app-publish-mcp@1.0.5`）注册，请将已注册的启动参数改为 `@kagayoi/app-publish-mcp@latest`。更新本 README 不会改变现有注册，但修改后每次启动都会自动使用最新版本。
+
 ### 2. Apple 凭证
 
 1. 前往 [App Store Connect > Keys](https://appstoreconnect.apple.com/access/integrations/api)

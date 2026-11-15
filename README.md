@@ -94,6 +94,8 @@ Use this MCP when you need to:
 
 No local clone or installation is required. The MCP client configuration below runs the latest npm release with `npx`.
 
+If you already registered the server with a pinned version (for example `@kagayoi/app-publish-mcp@1.0.5`), change the package argument in that registration to `@kagayoi/app-publish-mcp@latest`. Updating this README does not change existing registrations, but after that edit each launch uses the latest release automatically.
+
 To run with Bun instead of Node.js, use `bunx --bun` and the same package name:
 
 ```sh

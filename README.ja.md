@@ -75,6 +75,8 @@
 
 ローカル clone や事前インストールは不要です。以下の MCP クライアント設定から `npx` で npm の最新版を実行できます。
 
+すでに `@kagayoi/app-publish-mcp@1.0.5` のような固定版で登録している場合は、登録済みの起動引数を `@kagayoi/app-publish-mcp@latest` に書き換えると、以後は起動のたびに自動で最新版になります（README の更新だけでは既存の登録は変わりません）。
+
 ### 2. Apple認証情報
 
 1. [App Store Connect > Keys](https://appstoreconnect.apple.com/access/integrations/api)にアクセス
