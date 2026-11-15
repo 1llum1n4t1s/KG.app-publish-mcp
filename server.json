@@ -6,13 +6,13 @@
     "url": "https://github.com/1llum1n4t1s/KG.app-publish-mcp",
     "source": "github"
   },
-  "version": "1.0.8",
+  "version": "1.0.9",
   "packages": [
     {
       "registryType": "npm",
       "runtimeHint": "bunx",
       "identifier": "@kagayoi/app-publish-mcp",
-      "version": "1.0.8",
+      "version": "1.0.9",
       "transport": {
         "type": "stdio"
       },

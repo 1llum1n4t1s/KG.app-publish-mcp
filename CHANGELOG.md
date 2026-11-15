@@ -1,4 +1,11 @@
 # 変更履歴
+## 1.0.9 — 2026-11-15
+
+- Apple のツール応答から、入力に使われない JSON:API の `links`（リソースと関連ごとの URL）を除き、応答サイズを削減しました。ページングの `links.next` と `meta`、関連先の `data` は残ります。Google の応答は変わりません。
+- Apple のツール応答で、審査用アカウントのパスワード（`demoAccountPassword`）を `<redacted>` に置き換え、会話に表示されないようにしました（値の有無は分かります）。
+- 提出前に現状を確認できるよう、`apple_get_review_detail`（審査情報の取得。未作成は `exists: false`）と `apple_list_review_submissions`（審査提出の一覧、状態で絞り込み）を追加しました。
+- TestFlight の内部配信に必要な操作として、`apple_add_build_to_beta_groups`・`apple_remove_build_from_beta_groups`（ビルドのベータグループへの追加・削除）、`apple_set_build_whats_new`（「テスト内容」の設定。locale が既にあれば更新、無ければ作成）、`apple_list_build_beta_localizations`（一覧）を追加しました。
+
 ## 1.0.8 — 2026-11-15
 
 - 実行環境を Bun 1.4.4 以上に変更しました。npx・Node.js での起動には対応しなくなりました。MCP クライアントの登録は `"command": "bun"`、`"args": ["x", "--bun", "@kagayoi/app-publish-mcp@latest"]` へ書き換えてください（Google 認証は `bun x --bun @kagayoi/app-publish-mcp@latest auth google`）。
@@ -26,11 +33,6 @@
 Git のバージョン記録・コミット差分と既存の変更履歴をもとに、確認できた版ごとの変更点をまとめています。「Git 記録日」は公開日ではありません。番号の欠番だけから未確認のリリースは補っていません。
 
 ## 未リリース
-
-- Apple のツール応答から、入力に使われない JSON:API の `links`（リソースと関連ごとの URL）を除き、応答サイズを削減しました。ページングの `links.next` と `meta`、関連先の `data` は残ります。Google の応答は変わりません。
-- Apple のツール応答で、審査用アカウントのパスワード（`demoAccountPassword`）を `<redacted>` に置き換え、会話に表示されないようにしました（値の有無は分かります）。
-- 提出前に現状を確認できるよう、`apple_get_review_detail`（審査情報の取得。未作成は `exists: false`）と `apple_list_review_submissions`（審査提出の一覧、状態で絞り込み）を追加しました。
-- TestFlight の内部配信に必要な操作として、`apple_add_build_to_beta_groups`・`apple_remove_build_from_beta_groups`（ビルドのベータグループへの追加・削除）、`apple_set_build_whats_new`（「テスト内容」の設定。locale が既にあれば更新、無ければ作成）、`apple_list_build_beta_localizations`（一覧）を追加しました。
 
 ## [1.0.4] — 2026-09-12
 
