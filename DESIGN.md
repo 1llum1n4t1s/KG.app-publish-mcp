@@ -16,8 +16,10 @@ independently according to the credentials available at process startup.
 | `src/apple/tools.ts` / `src/google/tools.ts` | Define Zod input schemas, tool names/descriptions, and operation handlers | Handlers depend on their platform client rather than transport or credentials |
 | `src/apple/client.ts` | Creates short-lived ES256 App Store Connect JWTs and performs Apple API requests/uploads | Reads the configured `.p8` file locally; does not own MCP formatting |
 | `src/google/client.ts` | Configures the Android Publisher v3 client and implements Google API operations | Accepts a service account or OAuth refresh credentials |
+| `src/google/errors.ts` | Provides the not-configured message and formats Google API failures (HTTP status plus a selected subset of the response payload) | Pure helpers; no API calls |
 | `src/auth.ts` | Runs interactive Google OAuth through a localhost callback and stores the refresh credentials | Writes only to the per-user `~/.app-publish-mcp/google.json` store |
-| Package and registry metadata | Defines npm execution and discovery through MCP registries/marketplaces | Published artifacts contain compiled `dist`, package metadata, the license, and README documents |
+| `src/i18n.ts` + `src/locales/<tag>.json` | Resolves the display language and returns human-readable messages in nine languages (CLI output, startup diagnostics, the OAuth browser page) | Excludes MCP tool names, descriptions, schemas and errors returned to the AI assistant, which stay English; store-listing `locale`/`languageCode` arguments are API data, not UI language |
+| Package and registry metadata | Defines npm execution and discovery through MCP registries/marketplaces | The npm tarball contains compiled `dist` (including `dist/locales`), `package.json`, `LICENSE` and `README.md` |
 
 The tool registries currently provide 71 Apple tools and 47 Google tools. The
 server also exposes `app_release_checklist` and `app_store_optimization` prompts,
@@ -62,6 +64,17 @@ the submission intact and reports its ID for inspection and reuse: a lost respon
 does not prove Apple rejected the request. This deliberately limits automatic
 cleanup to attachment failure and avoids canceling an accepted review. User
 recovery instructions are in [README.md](README.md#submit-an-ios-app-update).
+
+### Display language
+
+Human-readable text is resolved per call so tests can switch languages. The CLI
+and startup diagnostics use `APP_PUBLISH_MCP_LANGUAGE`, then `LC_ALL`,
+`LC_MESSAGES`, `LANG` (empty, `C` and `POSIX` are skipped), the OS locale, then
+English. The OAuth callback page uses the browser's `Accept-Language`, then
+English. A missing key falls back to English and then to the key itself. Every
+dictionary must have the same keys and placeholders; `test/localization.test.ts`
+enforces this. User-facing language selection is documented in
+[README.md](README.md#3-google-credentials).
 
 ## Authentication model
 
@@ -126,6 +139,8 @@ validation suite.
 - Tool names are stable public API. Each tool belongs to exactly one exported
   platform registry, and common registration behavior remains centralized.
 - MCP stdout contains protocol messages only.
+- Text returned to the AI assistant (tool metadata and errors) is English;
+  localization applies only to text shown to a person.
 - Secrets and generated output stay outside Git: `dist/`, `.env`, `.p8` files,
   service-account key files, and the per-user OAuth token store are not source.
 - The npm package version is the runtime server version.
