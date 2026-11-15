@@ -24,7 +24,7 @@
 
 ## 功能特性
 
-### Apple App Store Connect（71 个工具）
+### Apple App Store Connect（77 个工具）
 | 类别 | 工具 |
 |----------|-------|
 | 应用管理 | `apple_list_apps`, `apple_get_app`, `apple_get_app_info`, `apple_update_category` |
@@ -36,14 +36,15 @@
 | 截图 | `apple_list_screenshot_sets`, `apple_create_screenshot_set`, `apple_upload_screenshot`, `apple_delete_screenshot` |
 | 构建版本 | `apple_list_builds`, `apple_assign_build` |
 | 年龄分级 | `apple_get_age_rating`, `apple_update_age_rating` |
-| 审核信息 | `apple_update_review_detail` |
-| 提交 | `apple_submit_for_review`, `apple_cancel_submission` |
+| 审核信息 | `apple_get_review_detail`, `apple_update_review_detail` |
+| 提交 | `apple_list_review_submissions`, `apple_submit_for_review`, `apple_cancel_submission` |
 | 定价 | `apple_get_pricing`, `apple_get_app_price_points`, `apple_set_price`, `apple_list_availability` |
 | 用户评论 | `apple_list_reviews`, `apple_respond_to_review` |
 | 证书 | `apple_list_certificates`, `apple_create_certificate`, `apple_revoke_certificate` |
 | 描述文件 | `apple_list_profiles`, `apple_create_profile`, `apple_delete_profile` |
 | 设备 | `apple_list_devices`, `apple_register_device`, `apple_update_device` |
 | TestFlight 测试组 | `apple_list_beta_groups`, `apple_create_beta_group`, `apple_delete_beta_group`, `apple_add_beta_testers_to_group`, `apple_remove_beta_testers_from_group` |
+| TestFlight 构建版本 | `apple_add_build_to_beta_groups`, `apple_remove_build_from_beta_groups`, `apple_list_build_beta_localizations`, `apple_set_build_whats_new` |
 | TestFlight 测试人员 | `apple_list_beta_testers`, `apple_invite_beta_tester`, `apple_delete_beta_tester` |
 | 应用内购买 | `apple_list_iap`, `apple_create_iap`, `apple_get_iap`, `apple_delete_iap` |
 | 订阅组 | `apple_list_subscription_groups`, `apple_create_subscription_group`, `apple_delete_subscription_group` |

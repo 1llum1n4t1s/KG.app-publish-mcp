@@ -24,7 +24,7 @@ Use este MCP quando precisar:
 
 ## Recursos
 
-### Apple App Store Connect (71 ferramentas)
+### Apple App Store Connect (77 ferramentas)
 | Categoria | Ferramentas |
 |----------|-------|
 | Gerenciamento de apps | `apple_list_apps`, `apple_get_app`, `apple_get_app_info`, `apple_update_category` |
@@ -36,14 +36,15 @@ Use este MCP quando precisar:
 | Capturas de tela | `apple_list_screenshot_sets`, `apple_create_screenshot_set`, `apple_upload_screenshot`, `apple_delete_screenshot` |
 | Builds | `apple_list_builds`, `apple_assign_build` |
 | Classificação etária | `apple_get_age_rating`, `apple_update_age_rating` |
-| Informações de revisão | `apple_update_review_detail` |
-| Envio | `apple_submit_for_review`, `apple_cancel_submission` |
+| Informações de revisão | `apple_get_review_detail`, `apple_update_review_detail` |
+| Envio | `apple_list_review_submissions`, `apple_submit_for_review`, `apple_cancel_submission` |
 | Preços | `apple_get_pricing`, `apple_get_app_price_points`, `apple_set_price`, `apple_list_availability` |
 | Avaliações de clientes | `apple_list_reviews`, `apple_respond_to_review` |
 | Certificados | `apple_list_certificates`, `apple_create_certificate`, `apple_revoke_certificate` |
 | Perfis de provisionamento | `apple_list_profiles`, `apple_create_profile`, `apple_delete_profile` |
 | Dispositivos | `apple_list_devices`, `apple_register_device`, `apple_update_device` |
 | Grupos beta do TestFlight | `apple_list_beta_groups`, `apple_create_beta_group`, `apple_delete_beta_group`, `apple_add_beta_testers_to_group`, `apple_remove_beta_testers_from_group` |
+| Builds do TestFlight | `apple_add_build_to_beta_groups`, `apple_remove_build_from_beta_groups`, `apple_list_build_beta_localizations`, `apple_set_build_whats_new` |
 | Testadores beta do TestFlight | `apple_list_beta_testers`, `apple_invite_beta_tester`, `apple_delete_beta_tester` |
 | Compras no app | `apple_list_iap`, `apple_create_iap`, `apple_get_iap`, `apple_delete_iap` |
 | Grupos de assinaturas | `apple_list_subscription_groups`, `apple_create_subscription_group`, `apple_delete_subscription_group` |

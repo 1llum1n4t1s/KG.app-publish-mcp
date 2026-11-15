@@ -22,7 +22,7 @@ independently according to the credentials available at process startup.
 | `src/i18n.ts` + `src/locales/<tag>.json` | Resolves the display language and returns human-readable messages in nine languages (CLI output, startup diagnostics, the OAuth browser page) | Excludes MCP tool names, descriptions, schemas and errors returned to the AI assistant, which stay English; store-listing `locale`/`languageCode` arguments are API data, not UI language |
 | Package and registry metadata | Defines npm execution and discovery through MCP registries/marketplaces | The npm tarball contains compiled `dist` (including `dist/locales`), `package.json`, `LICENSE`, `README.md` and the translated `README.<lang>.md` files |
 
-The tool registries currently provide 71 Apple tools and 47 Google tools. The
+The tool registries currently provide 77 Apple tools and 47 Google tools. The
 server also exposes `app_release_checklist` and `app_store_optimization` prompts,
 plus `app-publish://config` and `app-publish://supported-platforms` resources.
 
@@ -36,7 +36,9 @@ plus `app-publish://config` and `app-publish://supported-platforms` resources.
    the tool's Zod schema before the handler calls the platform client.
 4. The client reads any referenced local upload or key file and calls the official
    Apple or Google API over HTTPS.
-5. Successful values are serialized as indented JSON text in MCP content. Thrown
+5. Successful values are serialized as indented JSON text in MCP content. Apple
+   results first pass through `compactJsonApi` (`src/apple/compact.ts`); Google
+   results are serialized as returned. Thrown
    errors are converted to text content with `isError: true`; startup diagnostics
    go to stderr so stdout remains valid MCP traffic.
 
@@ -183,6 +185,19 @@ validation suite.
 - **Textual JSON tool results:** gives MCP clients a uniform representation across
   heterogeneous upstream responses. Clients must parse text when they need
   structured post-processing.
+- **Compacted Apple (JSON:API) results:** App Store Connect attaches `links.self`
+  to every resource and `links.{self,related}` to every relationship, which no
+  tool accepts as input; they made list responses several times larger and only
+  consumed the assistant's context. Common registration drops those per-resource
+  and per-relationship `links` (in `data` and `included`) and relationships left
+  empty. It keeps resource `type`/`id`/`attributes`, relationship linkage
+  (`data`) and `meta`, and the top-level `links` and `meta` (paging such as
+  `links.next`). Results that are not recognizably JSON:API, and all Google
+  results, are not touched. The same shaping step masks `demoAccountPassword`
+  (any non-empty value becomes `<redacted>`, empty/null stay visible, in every
+  response path and in echoed error text) so the reviewer demo password never
+  enters the assistant's conversation. Handlers see the raw response, so internal paging
+  (for example following `links.next`) is unaffected.
 
 Operational commands and contribution constraints live in [`AGENTS.md`](AGENTS.md);
 user installation and usage remain in [`README.md`](README.md).

@@ -13,7 +13,7 @@
     "dev": "bun --no-env-file --no-install src/index.ts",
     "start": "bun --no-env-file --no-install dist/index.js",
     "lint": "bun --no-env-file --no-install --bun run tsc --noEmit",
-    "test": "bun --no-env-file --no-install test test/google-app-signing.test.ts test/audit-fixes.test.ts test/localization.test.ts",
+    "test": "bun --no-env-file --no-install test test/google-app-signing.test.ts test/audit-fixes.test.ts test/localization.test.ts test/compact.test.ts",
     "test:stdio": "bun --no-env-file --no-install --bun run build && bun --no-env-file --no-install test test/submission-stdio.test.mjs"
   },
   "keywords": [

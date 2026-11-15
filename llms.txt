@@ -23,9 +23,9 @@ Requires Bun 1.4.4 or later.
 }
 ```
 
-## Tools (118 total)
+## Tools (124 total)
 
-### Apple App Store Connect (71)
+### Apple App Store Connect (77)
 - apple_list_apps — List all apps in App Store Connect
 - apple_get_app — Get app details by ID
 - apple_get_app_info — Get app info (categories, age rating)
@@ -50,7 +50,9 @@ Requires Bun 1.4.4 or later.
 - apple_assign_build — Assign a build to a version
 - apple_get_age_rating — Get age rating declaration
 - apple_update_age_rating — Update age rating declaration
+- apple_get_review_detail — Get App Review info of a version (password masked)
 - apple_update_review_detail — Update App Review contact info and notes
+- apple_list_review_submissions — List App Review submissions, optionally by state
 - apple_submit_for_review — Submit a version for App Review; optional submissionId submits all items in a verified existing submission. Failed submit requests preserve the submission for state verification and retry with the same ID.
 - apple_cancel_submission — Cancel a pending submission
 - apple_get_pricing — Get current pricing info
@@ -73,6 +75,10 @@ Requires Bun 1.4.4 or later.
 - apple_delete_beta_group — Delete a TestFlight beta group
 - apple_add_beta_testers_to_group — Add testers to a beta group
 - apple_remove_beta_testers_from_group — Remove testers from a beta group
+- apple_add_build_to_beta_groups — Add a build to beta groups
+- apple_remove_build_from_beta_groups — Remove a build from beta groups
+- apple_list_build_beta_localizations — List a build's What to Test localizations
+- apple_set_build_whats_new — Set a build's What to Test text for a locale
 - apple_list_beta_testers — List TestFlight beta testers
 - apple_invite_beta_tester — Invite a beta tester
 - apple_delete_beta_tester — Delete a beta tester

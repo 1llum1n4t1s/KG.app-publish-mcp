@@ -487,6 +487,26 @@ const updateAgeRating: ToolDef = {
   },
 };
 
+const getReviewDetail: ToolDef = {
+  name: 'apple_get_review_detail',
+  description: 'Get the App Review information (contact info, notes, demo account) of an App Store version. The demo account password is never returned; it is shown as "<redacted>" when set. Returns exists=false when no review detail has been created yet.',
+  schema: z.object({
+    versionId: z.string().describe('App Store Version ID'),
+  }),
+  handler: async (client, args) => {
+    try {
+      return await client.request(`/appStoreVersions/${args.versionId}/appStoreReviewDetail`);
+    } catch (err: unknown) {
+      if (!(err instanceof AppleApiError) || err.status !== 404) throw err;
+      return {
+        exists: false,
+        versionId: args.versionId,
+        message: 'No App Review detail has been created for this version yet. Use apple_update_review_detail to create it.',
+      };
+    }
+  },
+};
+
 const updateReviewDetail: ToolDef = {
   name: 'apple_update_review_detail',
   description: 'Update app review info (contact info, notes, demo account for reviewer)',
@@ -546,6 +566,22 @@ const updateReviewDetail: ToolDef = {
 // ═══════════════════════════════════════════
 // 7. Submission
 // ═══════════════════════════════════════════
+
+const listReviewSubmissions: ToolDef = {
+  name: 'apple_list_review_submissions',
+  description: 'List App Review submissions of an app, optionally filtered by state (e.g. READY_FOR_REVIEW for an unfinished draft, WAITING_FOR_REVIEW, IN_REVIEW, UNRESOLVED_ISSUES, COMPLETE). Use it before apple_submit_for_review to find an existing submissionId. Follow links.next in the response for further pages.',
+  schema: z.object({
+    appId: z.string().describe('App ID'),
+    states: z.array(z.string()).optional().describe('Filter by submission states'),
+    limit: z.number().int().min(1).max(200).optional(),
+  }),
+  handler: async (client, args) => {
+    const params: Record<string, string> = { 'filter[app]': args.appId };
+    if (args.states?.length) params['filter[state]'] = args.states.join(',');
+    if (args.limit) params['limit'] = String(args.limit);
+    return client.request('/reviewSubmissions', { params });
+  },
+};
 
 const submitForReview: ToolDef = {
   name: 'apple_submit_for_review',
@@ -1252,6 +1288,105 @@ const removeBetaTestersFromGroup: ToolDef = {
   },
 };
 
+/**
+ * Adds or removes one build in several beta groups. Apple's relationship endpoint is
+ * per group, so groups are processed in order; a failure names the groups already
+ * changed so the caller can reconcile instead of guessing.
+ */
+async function changeBuildBetaGroups(
+  client: AppleClient,
+  method: 'POST' | 'DELETE',
+  buildId: string,
+  betaGroupIds: string[],
+): Promise<{ buildId: string; betaGroupIds: string[] }> {
+  const done: string[] = [];
+  for (const betaGroupId of betaGroupIds) {
+    try {
+      await client.request(`/betaGroups/${betaGroupId}/relationships/builds`, {
+        method,
+        body: { data: [{ type: 'builds', id: buildId }] },
+      });
+      done.push(betaGroupId);
+    } catch (err: unknown) {
+      const reason = err instanceof Error ? err.message : String(err);
+      throw new Error(
+        `${reason} (beta group ${betaGroupId}; already ${method === 'POST' ? 'added to' : 'removed from'}: ${done.length ? done.join(', ') : 'none'})`,
+        { cause: err },
+      );
+    }
+  }
+  return { buildId, betaGroupIds: done };
+}
+
+const addBuildToBetaGroups: ToolDef = {
+  name: 'apple_add_build_to_beta_groups',
+  description: 'Add a build to one or more TestFlight beta groups (makes the build available to the testers in those groups)',
+  schema: z.object({
+    buildId: z.string().describe('Build ID'),
+    betaGroupIds: z.array(z.string()).min(1).describe('Array of beta group IDs'),
+  }),
+  handler: async (client, args) => changeBuildBetaGroups(client, 'POST', args.buildId, args.betaGroupIds),
+};
+
+const removeBuildFromBetaGroups: ToolDef = {
+  name: 'apple_remove_build_from_beta_groups',
+  description: 'Remove a build from one or more TestFlight beta groups',
+  schema: z.object({
+    buildId: z.string().describe('Build ID'),
+    betaGroupIds: z.array(z.string()).min(1).describe('Array of beta group IDs'),
+  }),
+  handler: async (client, args) => changeBuildBetaGroups(client, 'DELETE', args.buildId, args.betaGroupIds),
+};
+
+const listBuildBetaLocalizations: ToolDef = {
+  name: 'apple_list_build_beta_localizations',
+  description: 'List the TestFlight "What to Test" localizations (betaBuildLocalizations) of a build',
+  schema: z.object({
+    buildId: z.string().describe('Build ID'),
+    limit: z.number().int().min(1).max(200).optional(),
+  }),
+  handler: async (client, args) => {
+    const params: Record<string, string> = {};
+    if (args.limit) params['limit'] = String(args.limit);
+    return client.request(`/builds/${args.buildId}/betaBuildLocalizations`, { params });
+  },
+};
+
+const setBuildWhatsNew: ToolDef = {
+  name: 'apple_set_build_whats_new',
+  description: 'Set the TestFlight "What to Test" text (whatsNew) of a build for one locale. Updates the existing localization for that locale, or creates it when missing.',
+  schema: z.object({
+    buildId: z.string().describe('Build ID'),
+    locale: z.string().min(1).describe('Locale (e.g. en-US, ja)'),
+    whatsNew: z.string().min(1).max(4000).describe('What to Test text (up to 4000 characters)'),
+  }),
+  handler: async (client, args) => {
+    // 200 is the API maximum, above any number of locales a build can have.
+    const existing: any = await client.request(`/builds/${args.buildId}/betaBuildLocalizations`, {
+      params: { limit: '200' },
+    });
+    const match = (existing?.data ?? []).find((item: any) => item?.attributes?.locale === args.locale);
+    if (match?.id) {
+      return client.request(`/betaBuildLocalizations/${match.id}`, {
+        method: 'PATCH',
+        body: {
+          data: { type: 'betaBuildLocalizations', id: match.id, attributes: { whatsNew: args.whatsNew } },
+        },
+      });
+    }
+    return client.request('/betaBuildLocalizations', {
+      method: 'POST',
+      body: {
+        data: {
+          type: 'betaBuildLocalizations',
+          attributes: { locale: args.locale, whatsNew: args.whatsNew },
+          relationships: { build: { data: { type: 'builds', id: args.buildId } } },
+        },
+      },
+    });
+  },
+};
+
 // ═══════════════════════════════════════════
 // 16. TestFlight - Beta Testers
 // ═══════════════════════════════════════════
@@ -1735,9 +1870,9 @@ export const appleTools: ToolDef[] = [
   // Builds
   listBuilds, assignBuild,
   // Age Rating & Review Info
-  getAgeRating, updateAgeRating, updateReviewDetail,
+  getAgeRating, updateAgeRating, getReviewDetail, updateReviewDetail,
   // Submission
-  submitForReview, cancelSubmission,
+  listReviewSubmissions, submitForReview, cancelSubmission,
   // Pricing & Availability
   getAppPricing, getAppPricePoints, setAppPrice, listTerritoryAvailability,
   // Customer Reviews
@@ -1753,6 +1888,8 @@ export const appleTools: ToolDef[] = [
   // TestFlight - Beta Groups
   listBetaGroups, createBetaGroup, deleteBetaGroup,
   addBetaTestersToGroup, removeBetaTestersFromGroup,
+  // TestFlight - Builds
+  addBuildToBetaGroups, removeBuildFromBetaGroups, listBuildBetaLocalizations, setBuildWhatsNew,
   // TestFlight - Beta Testers
   listBetaTesters, inviteBetaTester, deleteBetaTester,
   // In-App Purchases

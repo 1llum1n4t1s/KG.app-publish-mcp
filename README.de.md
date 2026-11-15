@@ -24,7 +24,7 @@ Verwenden Sie diesen MCP, wenn Sie Folgendes tun möchten:
 
 ## Funktionen
 
-### Apple App Store Connect (71 Tools)
+### Apple App Store Connect (77 Tools)
 | Kategorie | Tools |
 |----------|-------|
 | App-Verwaltung | `apple_list_apps`, `apple_get_app`, `apple_get_app_info`, `apple_update_category` |
@@ -36,14 +36,15 @@ Verwenden Sie diesen MCP, wenn Sie Folgendes tun möchten:
 | Screenshots | `apple_list_screenshot_sets`, `apple_create_screenshot_set`, `apple_upload_screenshot`, `apple_delete_screenshot` |
 | Builds | `apple_list_builds`, `apple_assign_build` |
 | Altersfreigabe | `apple_get_age_rating`, `apple_update_age_rating` |
-| Prüfinformationen | `apple_update_review_detail` |
-| Einreichung | `apple_submit_for_review`, `apple_cancel_submission` |
+| Prüfinformationen | `apple_get_review_detail`, `apple_update_review_detail` |
+| Einreichung | `apple_list_review_submissions`, `apple_submit_for_review`, `apple_cancel_submission` |
 | Preisgestaltung | `apple_get_pricing`, `apple_get_app_price_points`, `apple_set_price`, `apple_list_availability` |
 | Kundenrezensionen | `apple_list_reviews`, `apple_respond_to_review` |
 | Zertifikate | `apple_list_certificates`, `apple_create_certificate`, `apple_revoke_certificate` |
 | Provisioning-Profile | `apple_list_profiles`, `apple_create_profile`, `apple_delete_profile` |
 | Geräte | `apple_list_devices`, `apple_register_device`, `apple_update_device` |
 | TestFlight-Betagruppen | `apple_list_beta_groups`, `apple_create_beta_group`, `apple_delete_beta_group`, `apple_add_beta_testers_to_group`, `apple_remove_beta_testers_from_group` |
+| TestFlight-Builds | `apple_add_build_to_beta_groups`, `apple_remove_build_from_beta_groups`, `apple_list_build_beta_localizations`, `apple_set_build_whats_new` |
 | TestFlight-Betatester | `apple_list_beta_testers`, `apple_invite_beta_tester`, `apple_delete_beta_tester` |
 | In-App-Käufe | `apple_list_iap`, `apple_create_iap`, `apple_get_iap`, `apple_delete_iap` |
 | Abonnementgruppen | `apple_list_subscription_groups`, `apple_create_subscription_group`, `apple_delete_subscription_group` |

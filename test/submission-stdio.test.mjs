@@ -111,3 +111,68 @@ test('ビルド済みstdio: 同一snapshotの分割uploadと両Google価格経�
     await transport.close();
   }
 });
+
+test('ビルド済みstdio: Appleの応答からJSON:APIの不要なlinksだけを除く', { timeout: 30_000 }, async () => {
+  const transport = new StdioClientTransport({
+    command: process.execPath,
+    args: ['--import', preload('./fixtures/apple-compact.mjs'),
+      fileURLToPath(new URL('../dist/cli.js', import.meta.url))],
+    env: { APP_PUBLISH_MCP_LANGUAGE: 'en', APPLE_KEY_ID: 'fixture', APPLE_ISSUER_ID: 'fixture', APPLE_P8_PATH: 'unused-fixture-key' },
+    stderr: 'pipe',
+  });
+  const client = new Client({ name: 'compact-regression', version: '1.0.0' });
+  let stderr = '';
+  transport.stderr?.on('data', data => { stderr += data; });
+  try {
+    await client.connect(transport);
+    const result = await client.callTool({ name: 'apple_list_builds', arguments: { appId: 'app' } });
+    const text = result.content.map(item => item.text ?? '').join('\n');
+    assert.notEqual(result.isError, true, `${text}\n${stderr}`);
+    assert.deepEqual(JSON.parse(text), {
+      data: [{
+        type: 'builds', id: 'build-1', attributes: { version: '7' },
+        relationships: { app: { data: { type: 'apps', id: 'app' } } },
+      }],
+      links: { self: 'https://example.invalid/builds', next: 'https://example.invalid/builds?cursor=abc' },
+      meta: { paging: { total: 9, limit: 1 } },
+    });
+  } catch (error) {
+    throw new Error(`${error.message}\n${stderr}`, { cause: error });
+  } finally {
+    await client.close();
+    await transport.close();
+  }
+});
+
+test('ビルド済みstdio: 審査用アカウントのパスワードを会話へ出さない', { timeout: 30_000 }, async () => {
+  const transport = new StdioClientTransport({
+    command: process.execPath,
+    args: ['--import', preload('./fixtures/apple-redact.mjs'),
+      fileURLToPath(new URL('../dist/cli.js', import.meta.url))],
+    env: { APP_PUBLISH_MCP_LANGUAGE: 'en', APPLE_KEY_ID: 'fixture', APPLE_ISSUER_ID: 'fixture', APPLE_P8_PATH: 'unused-fixture-key' },
+    stderr: 'pipe',
+  });
+  const client = new Client({ name: 'redact-regression', version: '1.0.0' });
+  let stderr = '';
+  transport.stderr?.on('data', data => { stderr += data; });
+  try {
+    await client.connect(transport);
+    const names = (await client.listTools()).tools.map(item => item.name);
+    assert.ok(names.includes('apple_get_review_detail') && names.includes('apple_list_review_submissions'));
+    for (const [name, args] of [
+      ['apple_get_review_detail', { versionId: 'v' }],
+      ['apple_update_review_detail', { versionId: 'v', demoAccountPassword: 'fixture-secret-value' }],
+    ]) {
+      const result = await client.callTool({ name, arguments: args });
+      const text = result.content.map(item => item.text ?? '').join('\n');
+      assert.notEqual(result.isError, true, `${text}\n${stderr}`);
+      assert.equal(text.includes('fixture-secret-value'), false, name);
+      assert.equal(JSON.parse(text).data.attributes.demoAccountPassword, '<redacted>');
+    }
+  } catch (error) {
+    throw new Error(`${error.message}\n${stderr}`, { cause: error });
+  } finally {
+    await client.close();
+    await transport.close();
+  }
+});

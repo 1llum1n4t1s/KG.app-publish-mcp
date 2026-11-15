@@ -27,6 +27,11 @@ Git のバージョン記録・コミット差分と既存の変更履歴をも�
 
 ## 未リリース
 
+- Apple のツール応答から、入力に使われない JSON:API の `links`（リソースと関連ごとの URL）を除き、応答サイズを削減しました。ページングの `links.next` と `meta`、関連先の `data` は残ります。Google の応答は変わりません。
+- Apple のツール応答で、審査用アカウントのパスワード（`demoAccountPassword`）を `<redacted>` に置き換え、会話に表示されないようにしました（値の有無は分かります）。
+- 提出前に現状を確認できるよう、`apple_get_review_detail`（審査情報の取得。未作成は `exists: false`）と `apple_list_review_submissions`（審査提出の一覧、状態で絞り込み）を追加しました。
+- TestFlight の内部配信に必要な操作として、`apple_add_build_to_beta_groups`・`apple_remove_build_from_beta_groups`（ビルドのベータグループへの追加・削除）、`apple_set_build_whats_new`（「テスト内容」の設定。locale が既にあれば更新、無ければ作成）、`apple_list_build_beta_localizations`（一覧）を追加しました。
+
 ## [1.0.4] — 2026-09-12
 
 - 対応環境を Node.js 22 以上へ統一。Node.js 18・20 を使用している場合は、更新前に Node.js をアップグレードしてください。

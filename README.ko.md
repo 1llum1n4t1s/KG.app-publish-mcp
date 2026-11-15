@@ -24,7 +24,7 @@
 
 ## 기능
 
-### Apple App Store Connect (도구 71개)
+### Apple App Store Connect (도구 77개)
 | 카테고리 | 도구 |
 |----------|-------|
 | 앱 관리 | `apple_list_apps`, `apple_get_app`, `apple_get_app_info`, `apple_update_category` |
@@ -36,14 +36,15 @@
 | 스크린샷 | `apple_list_screenshot_sets`, `apple_create_screenshot_set`, `apple_upload_screenshot`, `apple_delete_screenshot` |
 | 빌드 | `apple_list_builds`, `apple_assign_build` |
 | 연령 등급 | `apple_get_age_rating`, `apple_update_age_rating` |
-| 심사 정보 | `apple_update_review_detail` |
-| 심사 제출 | `apple_submit_for_review`, `apple_cancel_submission` |
+| 심사 정보 | `apple_get_review_detail`, `apple_update_review_detail` |
+| 심사 제출 | `apple_list_review_submissions`, `apple_submit_for_review`, `apple_cancel_submission` |
 | 가격 | `apple_get_pricing`, `apple_get_app_price_points`, `apple_set_price`, `apple_list_availability` |
 | 고객 리뷰 | `apple_list_reviews`, `apple_respond_to_review` |
 | 인증서 | `apple_list_certificates`, `apple_create_certificate`, `apple_revoke_certificate` |
 | 프로비저닝 프로파일 | `apple_list_profiles`, `apple_create_profile`, `apple_delete_profile` |
 | 기기 | `apple_list_devices`, `apple_register_device`, `apple_update_device` |
 | TestFlight 베타 그룹 | `apple_list_beta_groups`, `apple_create_beta_group`, `apple_delete_beta_group`, `apple_add_beta_testers_to_group`, `apple_remove_beta_testers_from_group` |
+| TestFlight 빌드 | `apple_add_build_to_beta_groups`, `apple_remove_build_from_beta_groups`, `apple_list_build_beta_localizations`, `apple_set_build_whats_new` |
 | TestFlight 베타 테스터 | `apple_list_beta_testers`, `apple_invite_beta_tester`, `apple_delete_beta_tester` |
 | 인앱 결제 | `apple_list_iap`, `apple_create_iap`, `apple_get_iap`, `apple_delete_iap` |
 | 구독 그룹 | `apple_list_subscription_groups`, `apple_create_subscription_group`, `apple_delete_subscription_group` |

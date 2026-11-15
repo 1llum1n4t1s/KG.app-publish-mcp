@@ -5,6 +5,7 @@ import { AppleClient } from './apple/client.js';
 import { GoogleClient } from './google/client.js';
 import { formatGoogleApiError, GOOGLE_NOT_CONFIGURED_MESSAGE } from './google/errors.js';
 import { appleTools } from './apple/tools.js';
+import { formatAppleResult, redactSecretText } from './apple/compact.js';
 import { googleTools } from './google/tools.js';
 import { loadSavedGoogleToken } from './auth.js';
 import { readFileSync } from 'fs';
@@ -75,6 +76,8 @@ function registerTools<C>(
   client: C | null,
   notConfiguredText: string,
   describeError: (err: any) => string,
+  // Platform-specific result shaping applied before serialization (identity by default).
+  formatResult: (result: any) => any = result => result,
 ): void {
   for (const tool of tools) {
     target.tool(tool.name, tool.description, tool.schema.shape, async (args: any) => {
@@ -86,7 +89,7 @@ function registerTools<C>(
       }
       try {
         const result = await tool.handler(client, args);
-        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+        return { content: [{ type: 'text' as const, text: JSON.stringify(formatResult(result), null, 2) }] };
       } catch (err: unknown) {
         return { content: [{ type: 'text' as const, text: `Error: ${describeError(err)}` }], isError: true };
       }
@@ -101,7 +104,10 @@ registerTools(
   appleClient,
   'Apple client not configured. Set APPLE_KEY_ID, APPLE_ISSUER_ID, APPLE_P8_PATH env vars.',
   // Error 以外が throw された場合の文面も従来どおりにするため、正規化せず message をそのまま読む。
-  err => err.message,
+  err => redactSecretText(err.message),
+  // Drop JSON:API links nobody can use as input (keeps data, meta and paging links)
+  // and mask secrets such as demoAccountPassword before the text reaches the client.
+  formatAppleResult,
 );
 registerTools(server, googleTools, googleClient, GOOGLE_NOT_CONFIGURED_MESSAGE, formatGoogleApiError);
 
