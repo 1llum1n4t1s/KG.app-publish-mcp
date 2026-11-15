@@ -1,4 +1,4 @@
-**English** | [한국어](README.ko.md) | [中文](README.zh.md) | [日本語](README.ja.md)
+**English** | [日本語](README.ja.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Português (Brasil)](README.pt-BR.md)
 
 # @kagayoi/app-publish-mcp
 
@@ -140,6 +140,16 @@ Restart the MCP server to load them. Alternatively, provide all three variables
 A service account takes precedence over OAuth; a complete OAuth environment takes
 precedence over saved credentials. An incomplete OAuth environment still allows
 saved credentials to load.
+
+The messages printed by `auth google` and the browser sign-in page are shown in
+your language (Japanese, English, Simplified Chinese, Traditional Chinese,
+Korean, Spanish, French, German or Brazilian Portuguese). The command line
+follows `APP_PUBLISH_MCP_LANGUAGE`, then `LC_ALL`, `LC_MESSAGES`, `LANG` and the
+OS locale; set `APP_PUBLISH_MCP_LANGUAGE` (for example `ja` or `pt-BR`) to choose
+a language explicitly. The browser page follows the browser's `Accept-Language`.
+MCP tool descriptions and errors returned to the AI assistant stay in English,
+and store-listing languages such as `locale` and `languageCode` are API arguments
+that this setting does not change.
 
 ### 4. Add to Claude Code
 

@@ -8,6 +8,9 @@ This repository provides the `@kagayoi/app-publish-mcp` stdio MCP server. Read
 - `src/index.ts` composes the MCP server, registers tools, prompts, and resources,
   and owns the stdio transport.
 - `src/cli.ts` selects normal server startup or the Google OAuth command.
+- `src/i18n.ts` and `src/locales/<tag>.json` hold the human-readable messages
+  (CLI output, startup diagnostics, the Google OAuth browser page) in nine
+  languages: ja, en, zh-CN, zh-TW, ko, es, fr, de, pt-BR.
 - `src/apple/` and `src/google/` contain platform clients and declarative tool
   registries. Keep API transport details in `client.ts` and MCP schemas/handlers
   in `tools.ts`.
@@ -35,6 +38,20 @@ This repository provides the `@kagayoi/app-publish-mcp` stdio MCP server. Read
 - When a user-visible tool, prompt, resource, configuration variable, package
   name, or install command changes, update `README.md` and the applicable
   published metadata in the same change. Keep README content user-focused.
+- `README.md` (English) is the source. When it changes, update `README.ja.md`,
+  `README.zh-CN.md`, `README.zh-TW.md`, `README.ko.md`, `README.es.md`,
+  `README.fr.md`, `README.de.md` and `README.pt-BR.md` in the same change, and
+  keep the nine-language switch line on the first line of every file. Do not
+  translate commands, paths, configuration keys, environment variable names,
+  product names, URLs or the package name.
+- MCP tool names, descriptions, input schema text and errors returned to the AI
+  assistant stay in English. When adding human-readable text (CLI output,
+  startup or error messages shown to a person, the OAuth browser page), add it
+  to every `src/locales/<tag>.json` dictionary (same keys and `{name}`
+  placeholders) and run `test/localization.test.ts`. Language is resolved by
+  `APP_PUBLISH_MCP_LANGUAGE` → `LC_ALL` → `LC_MESSAGES` → `LANG` → the OS
+  locale → English; the browser page uses `Accept-Language`. Tests that assert
+  English messages set `APP_PUBLISH_MCP_LANGUAGE=en`.
 - Keep `package.json`, `package-lock.json`, `server.json`, and release branch
   versions synchronized for a release. The publish workflow requires
   `release/<version>` to match `package.json` and publishes using GitHub OIDC Trusted Publishing. The publication workflow runs install, build, pack, verification and OIDC publication
