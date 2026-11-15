@@ -1,4 +1,10 @@
 # 変更履歴
+## 1.0.8 — 2026-11-15
+
+- 実行環境を Bun 1.4.4 以上に変更しました。npx・Node.js での起動には対応しなくなりました。MCP クライアントの登録は `"command": "bun"`、`"args": ["x", "--bun", "@kagayoi/app-publish-mcp@latest"]` へ書き換えてください（Google 認証は `bun x --bun @kagayoi/app-publish-mcp@latest auth google`）。
+- 依存ライブラリ（googleapis・google-auth-library など）を更新し、MCP SDK が使う `@hono/node-server` の既知の脆弱性 2 件を解消しました。
+- `llms.txt` のツール一覧に `apple_get_app_price_points` を追加し、`apple_set_price` の説明を現在の価格設定方式に合わせました。
+
 ## 1.0.7 — 2026-11-15
 
 - `auth google` のメッセージと Google 認証のブラウザー画面を 9 言語（日本語・英語・簡体字中国語・繁体字中国語・韓国語・スペイン語・フランス語・ドイツ語・ブラジルポルトガル語）に対応し、`APP_PUBLISH_MCP_LANGUAGE` などで切り替えられるようにしました。MCP ツールの説明は英語のままです。
