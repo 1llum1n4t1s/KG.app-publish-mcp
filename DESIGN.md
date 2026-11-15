@@ -107,11 +107,12 @@ Normal dependency validation also runs on GitHub-hosted ubuntu-latest. The verif
 SHA-512 and manifest are checked before publishing the same archive without
 repacking. No saved npm publication token is used.
 The native C# publisher exchanges GitHub OIDC for a package-specific short-lived
-token and signs SLSA v1 provenance with cosign 3.0.4. Its fixed binary hash,
+token and signs SLSA v1 provenance with cosign 3.1.4. Its fixed binary hash,
 upstream signature, signed subject, workflow identity, issuer and archive digest
 are checked before upload. Existing versions require identical integrity and
-valid npm registry provenance metadata. After PUT succeeds, the registry integrity and provenance metadata are checked
-again. Unknown outcomes fail without retrying PUT. Source-hash-specific namespaces preserve
+valid npm registry provenance metadata. A successful PUT header means npm
+acceptance without parsing its body or waiting for public propagation. Unknown
+outcomes fail without retrying PUT. Source-hash-specific namespaces preserve
 the PowerShell source reload boundary. The workflow filename and existing release/manual conditions remain unchanged,
 so the existing npm Trusted Publisher registration stays applicable.
 

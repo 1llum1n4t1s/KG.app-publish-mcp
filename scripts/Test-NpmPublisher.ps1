@@ -41,9 +41,19 @@ try {
         Write-Output 'PowerShell Set-Location relative archive and pack-result entry contracts passed'
     } finally { Pop-Location }
     $source = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'NpmPublisher.cs'))
-    $marker = 'manifest["_id"] = name + "@" + version;'
-    if (-not $source.Contains($marker)) { throw 'Source-version fixture marker missing' }
-    $alternate = $source.Replace($marker, ($marker + ' manifest["fixtureSourceVersion"] = "alternate";'))
+    $alternate = @'
+namespace Kagayoi.Npm
+{
+    public static class Publisher
+    {
+        public static string Run(string packageFile, string expectedIntegrity, string packResultPath, bool prepareOnly)
+        {
+            if (!prepareOnly) throw new System.InvalidOperationException("Fixture requires PrepareOnly.");
+            return "{\"Metadata\":{\"versions\":{\"1.2.3\":{\"fixtureSourceVersion\":\"alternate\"}}}}";
+        }
+    }
+}
+'@
     foreach ($entry in @(@('source-original', $source), @('source-alternate', $alternate))) {
         $directory = Join-Path $WorkDirectory $entry[0]
         [IO.Directory]::CreateDirectory($directory) | Out-Null

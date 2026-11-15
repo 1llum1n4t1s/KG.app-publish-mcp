@@ -138,19 +138,20 @@ namespace Kagayoi.Npm
             return new Publication { PackageFile = packageFile, Bytes = bytes, Integrity = integrity, Digest = digest, Name = name, Version = version, Statement = statement, Metadata = metadata };
         }
 
-        internal static async Task<JsonNode> Send(HttpClient client, string method, string url, string token, JsonNode body = null, bool allowMissing = false)
+        internal static async Task<JsonNode> Send(HttpClient client, string method, string url, string token, JsonNode body = null, bool allowMissing = false, bool ignoreSuccessBody = false)
         {
             using (var request = new HttpRequestMessage(new HttpMethod(method), url))
             {
                 if (!string.IsNullOrEmpty(token)) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
                 if (body != null) request.Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
                 HttpResponseMessage response;
-                try { response = await client.SendAsync(request).ConfigureAwait(false); }
+                try { response = await client.SendAsync(request, ignoreSuccessBody ? HttpCompletionOption.ResponseHeadersRead : HttpCompletionOption.ResponseContentRead).ConfigureAwait(false); }
                 catch { throw new InvalidOperationException("Native npm request failed (" + method + "); response unknown. Inspect registry before retrying."); }
                 using (response)
                 {
                     if (allowMissing && response.StatusCode == HttpStatusCode.NotFound) return null;
                     Require(response.IsSuccessStatusCode, "Native npm request rejected (" + method + " HTTP " + (int)response.StatusCode + ").");
+                    if (ignoreSuccessBody) return null;
                     var text = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                     if (string.IsNullOrEmpty(text))
                     {
@@ -177,8 +178,10 @@ namespace Kagayoi.Npm
             if (existing != null)
             {
                 Require(Text(existing["dist"]?["integrity"]) == publication.Integrity, "Published version has different archive integrity.");
-                Require(HasProvenance(existing, publication.Name, publication.Version), "Published npm archive/provenance confirmation failed.");
-                return "Already published identical archive: " + publication.Name + "@" + publication.Version;
+                if (HasProvenance(existing, publication.Name, publication.Version))
+                    return "Already published identical archive: " + publication.Name + "@" + publication.Version;
+                // provenanceが無い既存版は、非公開リポジトリから公開された正当な版の可能性がある。
+                // 公開状態はOIDCトークンでしか確定できないため、下のidentity取得まで判定を保留する。
             }
             Require(!string.IsNullOrEmpty(Value(env, "ACTIONS_ID_TOKEN_REQUEST_URL")) && !string.IsNullOrEmpty(Value(env, "ACTIONS_ID_TOKEN_REQUEST_TOKEN")), "GitHub id-token: write is required.");
             Uri oidc;
@@ -186,19 +189,46 @@ namespace Kagayoi.Npm
             var builder = new UriBuilder(oidc) { Query = oidc.Query.TrimStart('?') + "&audience=npm%3Aregistry.npmjs.org" };
             var identity = await Send(client, "GET", builder.Uri.AbsoluteUri, Value(env, "ACTIONS_ID_TOKEN_REQUEST_TOKEN")).ConfigureAwait(false);
             Require(!string.IsNullOrEmpty(Text(identity?["value"])), "GitHub OIDC returned no identity token.");
+            // npmは非公開リポジトリ由来のprovenanceをHTTP 422で拒否する。npm CLIと同じく、
+            // OIDCトークンの repository_visibility が public の場合だけprovenanceを添付する。
+            var attachProvenance = RepositoryVisibility(Text(identity["value"])) == "public";
+            if (existing != null)
+            {
+                Require(!attachProvenance, "Published npm archive/provenance confirmation failed.");
+                return "Already published identical archive without provenance (non-public repository): " + publication.Name + "@" + publication.Version;
+            }
             var exchange = await Send(client, "POST", Registry + "-/npm/v1/oidc/token/exchange/package/" + escapedName, Text(identity["value"])).ConfigureAwait(false);
             Require(!string.IsNullOrEmpty(Text(exchange?["token"])), "npm OIDC exchange returned no token.");
-            var bundleText = await signer.Sign(publication, env).ConfigureAwait(false);
-            var bundle = JsonNode.Parse(bundleText);
-            var signed = JsonNode.Parse(Encoding.UTF8.GetString(Convert.FromBase64String(Text(bundle?["dsseEnvelope"]?["payload"]))));
-            var subjects = signed?["subject"] as JsonArray;
-            Require(subjects != null && subjects.Count == 1 && Text(subjects[0]?["name"]) == Text(publication.Statement["subject"]?[0]?["name"]) && Text(subjects[0]?["digest"]?["sha512"]) == publication.Digest, "Signed npm provenance subject mismatch.");
-            publication.Metadata["_attachments"][publication.Name + "-" + publication.Version + ".sigstore"] = new JsonObject { ["content_type"] = Text(bundle["mediaType"]), ["data"] = bundleText, ["length"] = bundleText.Length };
+            if (attachProvenance)
+            {
+                var bundleText = await signer.Sign(publication, env).ConfigureAwait(false);
+                var bundle = JsonNode.Parse(bundleText);
+                var signed = JsonNode.Parse(Encoding.UTF8.GetString(Convert.FromBase64String(Text(bundle?["dsseEnvelope"]?["payload"]))));
+                var subjects = signed?["subject"] as JsonArray;
+                Require(subjects != null && subjects.Count == 1 && Text(subjects[0]?["name"]) == Text(publication.Statement["subject"]?[0]?["name"]) && Text(subjects[0]?["digest"]?["sha512"]) == publication.Digest, "Signed npm provenance subject mismatch.");
+                publication.Metadata["_attachments"][publication.Name + "-" + publication.Version + ".sigstore"] = new JsonObject { ["content_type"] = Text(bundle["mediaType"]), ["data"] = bundleText, ["length"] = bundleText.Length };
+            }
             Require(Convert.ToHexString(SHA512.HashData(File.ReadAllBytes(publication.PackageFile))).ToLowerInvariant() == publication.Digest, "Archive changed after verification.");
-            await Send(client, "PUT", Registry + escapedName, Text(exchange["token"]), publication.Metadata).ConfigureAwait(false);
-            var published = await Send(client, "GET", versionUrl, "").ConfigureAwait(false);
-            Require(Text(published?["dist"]?["integrity"]) == publication.Integrity && HasProvenance(published, publication.Name, publication.Version), "Published npm archive/provenance confirmation failed.");
-            return "Published verified archive with GitHub OIDC and provenance: " + publication.Name + "@" + publication.Version;
+            await Send(client, "PUT", Registry + escapedName, Text(exchange["token"]), publication.Metadata, ignoreSuccessBody: true).ConfigureAwait(false);
+            return (attachProvenance ? "npm accepted publication: " : "npm accepted publication without provenance (non-public repository): ") + publication.Name + "@" + publication.Version;
+        }
+
+        // GitHub OIDCトークン（JWT）のpayloadから repository_visibility を読む。署名検証はnpmのexchangeが行うため、
+        // ここでは添付要否の判定だけに使う。値が読めない・想定外なら公開を止める（推測でprovenance有無を決めない）。
+        internal static string RepositoryVisibility(string jwt)
+        {
+            var parts = (jwt ?? "").Split('.');
+            Require(parts.Length == 3, "GitHub OIDC token is not a JWT.");
+            string visibility;
+            try
+            {
+                var payload = parts[1].Replace('-', '+').Replace('_', '/');
+                payload = payload.PadRight(payload.Length + (4 - payload.Length % 4) % 4, '=');
+                visibility = Text(JsonNode.Parse(Encoding.UTF8.GetString(Convert.FromBase64String(payload)))?["repository_visibility"]);
+            }
+            catch { throw new InvalidOperationException("GitHub OIDC token payload is invalid."); }
+            Require(visibility == "public" || visibility == "private" || visibility == "internal", "GitHub OIDC token has no repository_visibility.");
+            return visibility;
         }
     }
 
@@ -221,8 +251,8 @@ namespace Kagayoi.Npm
     }
     internal sealed class NativeSigner : ISigner
     {
-        internal const string CosignSha256 = "10DAB2FD2170B5AA0D5C0673A9A2793304960220B314F6A873BF39C2F08287AA";
-        internal const string ReleaseUrl = "https://github.com/sigstore/cosign/releases/download/v3.0.4/cosign-linux-amd64";
+        internal const string CosignSha256 = "424E2C97D0B45FD7A6B608A87F090F35633F4C23ECE5F092D48BBA11AAF4BBFA";
+        internal const string ReleaseUrl = "https://github.com/sigstore/cosign/releases/download/v3.1.4/cosign-linux-amd64";
         private readonly HttpClient download;
         private readonly ICommandRunner runner;
         private readonly string expectedSha256;
