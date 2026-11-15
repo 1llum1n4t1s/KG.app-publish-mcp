@@ -97,26 +97,8 @@ export class AppleClient {
     return res.json() as Promise<T>;
   }
 
-  async upload(url: string, filePath: string, contentType: string): Promise<any> {
-    const data = fs.readFileSync(filePath);
-    const res = await fetch(url, {
-      method: 'PUT',
-      headers: {
-        Authorization: `Bearer ${this.getToken()}`,
-        'Content-Type': contentType,
-      },
-      body: data,
-      signal: AbortSignal.timeout(APPLE_UPLOAD_TIMEOUT_MS),
-    });
-
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`Apple upload → ${res.status}: ${text}`);
-    }
-    if (res.status === 204) return {};
-    return res.json();
-  }
-
+  // アップロードは App Store Connect が返した upload operation だけで行う。
+  // 返された URL へ JWT を付けて送らない（DESIGN.md の不変条件）ため、汎用の JWT 付き PUT は持たない。
   async uploadOperation(
     operation: {
       method?: string;

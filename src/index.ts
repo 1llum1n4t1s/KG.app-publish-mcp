@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { AppleClient } from './apple/client.js';
@@ -12,6 +12,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { z } from 'zod';
 import { tCli } from './i18n.js';
+import type { ToolDef } from './tool-def.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -61,41 +62,48 @@ if (googleSaPath) {
   }
 }
 
-// ── Register Apple tools ──
-for (const tool of appleTools) {
-  server.tool(tool.name, tool.description, tool.schema.shape, async (args: any) => {
-    if (!appleClient) {
-      return {
-        content: [{ type: 'text' as const, text: 'Apple client not configured. Set APPLE_KEY_ID, APPLE_ISSUER_ID, APPLE_P8_PATH env vars.' }],
-        isError: true,
-      };
-    }
-    try {
-      const result = await tool.handler(appleClient, args);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-    } catch (err: any) {
-      return { content: [{ type: 'text' as const, text: `Error: ${err.message}` }], isError: true };
-    }
-  });
+/**
+ * プラットフォームのツール群を共通の形で登録する。
+ * - client が未設定なら notConfiguredText を isError で返す（ツール自体は常に一覧へ載せる）。
+ * - 成功結果は整形済み JSON、例外は `Error: ` + describeError(err) のテキストへ変換する。
+ * client は起動時の環境変数から一度だけ決まり、以後は再代入されないため値で受け取る。
+ * 応答テキストは AI アシスタントとの契約なので、プラットフォームごとの文言・整形関数を呼び出し側で固定する。
+ */
+function registerTools<C>(
+  target: McpServer,
+  tools: readonly ToolDef<C>[],
+  client: C | null,
+  notConfiguredText: string,
+  describeError: (err: any) => string,
+): void {
+  for (const tool of tools) {
+    target.tool(tool.name, tool.description, tool.schema.shape, async (args: any) => {
+      if (!client) {
+        return {
+          content: [{ type: 'text' as const, text: notConfiguredText }],
+          isError: true,
+        };
+      }
+      try {
+        const result = await tool.handler(client, args);
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (err: unknown) {
+        return { content: [{ type: 'text' as const, text: `Error: ${describeError(err)}` }], isError: true };
+      }
+    });
+  }
 }
 
-// ── Register Google tools ──
-for (const tool of googleTools) {
-  server.tool(tool.name, tool.description, tool.schema.shape, async (args: any) => {
-    if (!googleClient) {
-      return {
-        content: [{ type: 'text' as const, text: GOOGLE_NOT_CONFIGURED_MESSAGE }],
-        isError: true,
-      };
-    }
-    try {
-      const result = await tool.handler(googleClient, args);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-    } catch (err: unknown) {
-      return { content: [{ type: 'text' as const, text: `Error: ${formatGoogleApiError(err)}` }], isError: true };
-    }
-  });
-}
+// ── Register Apple / Google tools（登録順は Apple → Google で固定） ──
+registerTools(
+  server,
+  appleTools,
+  appleClient,
+  'Apple client not configured. Set APPLE_KEY_ID, APPLE_ISSUER_ID, APPLE_P8_PATH env vars.',
+  // Error 以外が throw された場合の文面も従来どおりにするため、正規化せず message をそのまま読む。
+  err => err.message,
+);
+registerTools(server, googleTools, googleClient, GOOGLE_NOT_CONFIGURED_MESSAGE, formatGoogleApiError);
 
 // ── Prompts ──
 
@@ -297,15 +305,8 @@ export function createSandboxServer() {
     version: pkg.version,
   });
 
-  // Register Apple tools with null client (will show "not configured" at runtime)
-  for (const tool of appleTools) {
-    sandbox.tool(tool.name, tool.description, tool.schema.shape, async () => {
-      return { content: [{ type: 'text' as const, text: 'sandbox' }] };
-    });
-  }
-
-  // Register Google tools with null client
-  for (const tool of googleTools) {
+  // Smithery のスキャン用に、全ツールを固定応答 'sandbox' で登録する（順序は Apple → Google）
+  for (const tool of [...appleTools, ...googleTools]) {
     sandbox.tool(tool.name, tool.description, tool.schema.shape, async () => {
       return { content: [{ type: 'text' as const, text: 'sandbox' }] };
     });

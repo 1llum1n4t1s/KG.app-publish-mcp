@@ -2,14 +2,10 @@ import { z } from 'zod';
 import { createHash } from 'crypto';
 import fs from 'fs';
 import { AppleApiError, AppleClient } from './client.js';
+import type { ToolDef as PlatformToolDef } from '../tool-def.js';
 
-// Helper to define a tool
-interface ToolDef {
-  name: string;
-  description: string;
-  schema: z.ZodObject<any>;
-  handler: (client: AppleClient, args: any) => Promise<any>;
-}
+// Apple のツール定義（形は Google と共通。handler は AppleClient を受け取る）
+type ToolDef = PlatformToolDef<AppleClient>;
 
 // ═══════════════════════════════════════════
 // 1. App Management
@@ -1560,6 +1556,31 @@ const offerPriceEntry = z.object({
   pricePointId: z.string().describe('Price point ID from apple_get_subscription_price_points / apple_get_iap_price_points'),
 });
 
+/**
+ * offer code 作成時の価格を、JSON:API の relationships.prices.data（参照）と included（実体）の組へ変換する。
+ * subscription / IAP で違うのは価格リソースの type と price point 側の relationship キー・type だけ。
+ * body は JSON.stringify されて送信されるため、各オブジェクトのキー順
+ * （type → id → relationships、relationships 内は territory → price point）を変えないこと。
+ */
+function buildOfferCodePrices(
+  prices: Array<z.infer<typeof offerPriceEntry>>,
+  priceType: string,
+  pricePointKey: string,
+  pricePointType: string,
+) {
+  return {
+    references: prices.map((_, i) => ({ type: priceType, id: `price-${i}` })),
+    included: prices.map((price, i) => ({
+      type: priceType,
+      id: `price-${i}`,
+      relationships: {
+        territory: { data: { type: 'territories', id: price.territoryId } },
+        [pricePointKey]: { data: { type: pricePointType, id: price.pricePointId } },
+      },
+    })),
+  };
+}
+
 const listSubscriptionOfferCodes: ToolDef = {
   name: 'apple_list_subscription_offer_codes',
   description: 'List custom/one-time-use offer codes configured for a subscription',
@@ -1599,6 +1620,7 @@ const createSubscriptionOfferCode: ToolDef = {
   }),
   handler: async (client, args) => {
     const { subscriptionId, prices, ...attributes } = args;
+    const offerPrices = buildOfferCodePrices(prices, 'subscriptionOfferCodePrices', 'subscriptionPricePoint', 'subscriptionPricePoints');
     return client.request('/subscriptionOfferCodes', {
       method: 'POST',
       body: {
@@ -1607,22 +1629,10 @@ const createSubscriptionOfferCode: ToolDef = {
           attributes,
           relationships: {
             subscription: { data: { type: 'subscriptions', id: subscriptionId } },
-            prices: {
-              data: prices.map((p: z.infer<typeof offerPriceEntry>, i: number) => ({
-                type: 'subscriptionOfferCodePrices',
-                id: `price-${i}`,
-              })),
-            },
+            prices: { data: offerPrices.references },
           },
         },
-        included: prices.map((p: z.infer<typeof offerPriceEntry>, i: number) => ({
-          type: 'subscriptionOfferCodePrices',
-          id: `price-${i}`,
-          relationships: {
-            territory: { data: { type: 'territories', id: p.territoryId } },
-            subscriptionPricePoint: { data: { type: 'subscriptionPricePoints', id: p.pricePointId } },
-          },
-        })),
+        included: offerPrices.included,
       },
     });
   },
@@ -1662,6 +1672,7 @@ const createIAPOfferCode: ToolDef = {
   }),
   handler: async (client, args) => {
     const { iapId, prices, ...attributes } = args;
+    const offerPrices = buildOfferCodePrices(prices, 'inAppPurchaseOfferPrices', 'pricePoint', 'inAppPurchasePricePoints');
     return client.request('/inAppPurchaseOfferCodes', {
       method: 'POST',
       body: {
@@ -1670,22 +1681,10 @@ const createIAPOfferCode: ToolDef = {
           attributes,
           relationships: {
             inAppPurchase: { data: { type: 'inAppPurchases', id: iapId } },
-            prices: {
-              data: prices.map((p: z.infer<typeof offerPriceEntry>, i: number) => ({
-                type: 'inAppPurchaseOfferPrices',
-                id: `price-${i}`,
-              })),
-            },
+            prices: { data: offerPrices.references },
           },
         },
-        included: prices.map((p: z.infer<typeof offerPriceEntry>, i: number) => ({
-          type: 'inAppPurchaseOfferPrices',
-          id: `price-${i}`,
-          relationships: {
-            territory: { data: { type: 'territories', id: p.territoryId } },
-            pricePoint: { data: { type: 'inAppPurchasePricePoints', id: p.pricePointId } },
-          },
-        })),
+        included: offerPrices.included,
       },
     });
   },

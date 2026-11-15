@@ -1,13 +1,10 @@
 import { z } from 'zod';
 import type { androidpublisher_v3 } from 'googleapis/build/src/apis/androidpublisher/v3.js';
 import { GoogleClient } from './client.js';
+import type { ToolDef as PlatformToolDef } from '../tool-def.js';
 
-interface ToolDef {
-  name: string;
-  description: string;
-  schema: z.ZodObject<any>;
-  handler: (client: GoogleClient, args: any) => Promise<any>;
-}
+// Google のツール定義（形は Apple と共通。handler は GoogleClient を受け取る）
+type ToolDef = PlatformToolDef<GoogleClient>;
 
 const cloudKmsKeyVersionResource = z
   .string()

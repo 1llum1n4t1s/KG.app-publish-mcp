@@ -62,6 +62,34 @@ function readFileAsBase64(filePath: string): string {
   return readFileSync(filePath).toString('base64');
 }
 
+/**
+ * Google Play の一覧 API を、次ページのトークンが尽きるまで直列に取得して結合する。
+ * 各 API はトークンの引数名・応答フィールド名が異なるため、その差は fetchPage 側で吸収する。
+ * 同じトークンが再び返った場合は無限ループを避けるため、対象名（label）入りのエラーで止める。
+ * 空文字のトークンは従来どおり「次ページなし」として扱う。
+ */
+async function collectAllPages<T>(
+  label: string,
+  fetchPage: (pageToken: string | undefined) => Promise<{ items?: T[] | null; nextPageToken?: string | null }>,
+): Promise<T[]> {
+  const items: T[] = [];
+  const seenTokens = new Set<string>();
+  let pageToken: string | undefined;
+
+  do {
+    const page = await fetchPage(pageToken);
+    items.push(...(page.items ?? []));
+    const nextToken = page.nextPageToken ?? undefined;
+    if (nextToken && seenTokens.has(nextToken)) {
+      throw new Error(`Google Play returned a repeated ${label} page token: ${nextToken}`);
+    }
+    if (nextToken) seenTokens.add(nextToken);
+    pageToken = nextToken;
+  } while (pageToken);
+
+  return items;
+}
+
 export class GoogleClient {
   private publisher: androidpublisher_v3.Androidpublisher;
 
@@ -355,22 +383,11 @@ export class GoogleClient {
 
   // ─── In-App Products ───
   async listInAppProducts(packageName: string) {
-    const products: androidpublisher_v3.Schema$InAppProduct[] = [];
-    const seenTokens = new Set<string>();
-    let token: string | undefined;
-
-    do {
+    // 旧 inappproducts API は `token` 引数と tokenPagination.nextPageToken を使い、pageSize は指定しない。
+    return collectAllPages<androidpublisher_v3.Schema$InAppProduct>('in-app product', async token => {
       const res = await this.publisher.inappproducts.list({ packageName, token });
-      products.push(...(res.data.inappproduct ?? []));
-      const nextToken = res.data.tokenPagination?.nextPageToken ?? undefined;
-      if (nextToken && seenTokens.has(nextToken)) {
-        throw new Error(`Google Play returned a repeated in-app product page token: ${nextToken}`);
-      }
-      if (nextToken) seenTokens.add(nextToken);
-      token = nextToken;
-    } while (token);
-
-    return products;
+      return { items: res.data.inappproduct, nextPageToken: res.data.tokenPagination?.nextPageToken };
+    });
   }
 
   async getInAppProduct(packageName: string, sku: string) {
@@ -402,26 +419,14 @@ export class GoogleClient {
 
   // ─── Subscriptions (monetization) ───
   async listSubscriptions(packageName: string) {
-    const subscriptions: androidpublisher_v3.Schema$Subscription[] = [];
-    const seenTokens = new Set<string>();
-    let pageToken: string | undefined;
-
-    do {
+    return collectAllPages<androidpublisher_v3.Schema$Subscription>('subscription', async pageToken => {
       const res = await this.publisher.monetization.subscriptions.list({
         packageName,
         pageSize: 1000,
         pageToken,
       });
-      subscriptions.push(...(res.data.subscriptions ?? []));
-      const nextToken = res.data.nextPageToken ?? undefined;
-      if (nextToken && seenTokens.has(nextToken)) {
-        throw new Error(`Google Play returned a repeated subscription page token: ${nextToken}`);
-      }
-      if (nextToken) seenTokens.add(nextToken);
-      pageToken = nextToken;
-    } while (pageToken);
-
-    return subscriptions;
+      return { items: res.data.subscriptions, nextPageToken: res.data.nextPageToken };
+    });
   }
 
   async getSubscription(packageName: string, productId: string) {
@@ -441,24 +446,6 @@ export class GoogleClient {
       'regionsVersion.version': regionsVersionVersion,
       requestBody: subscription,
     });
-    return res.data;
-  }
-
-  async patchSubscription(
-    packageName: string,
-    productId: string,
-    subscription: androidpublisher_v3.Schema$Subscription,
-    updateMask?: string,
-    regionsVersionVersion?: string,
-  ) {
-    const params: any = {
-      packageName,
-      productId,
-      requestBody: subscription,
-    };
-    if (updateMask) params.updateMask = updateMask;
-    if (regionsVersionVersion) params['regionsVersion.version'] = regionsVersionVersion;
-    const res = await this.publisher.monetization.subscriptions.patch(params);
     return res.data;
   }
 
@@ -497,25 +484,16 @@ export class GoogleClient {
 
   // ─── One-time Products (monetization) ───
   async listOneTimeProducts(packageName: string) {
-    const oneTimeProducts: androidpublisher_v3.Schema$OneTimeProduct[] = [];
-    const seenTokens = new Set<string>();
-    let pageToken: string | undefined;
-
-    do {
+    const oneTimeProducts = await collectAllPages<androidpublisher_v3.Schema$OneTimeProduct>('one-time product', async pageToken => {
       const res = await this.publisher.monetization.onetimeproducts.list({
         packageName,
         pageSize: 1000,
         pageToken,
       });
-      oneTimeProducts.push(...(res.data.oneTimeProducts ?? []));
-      const nextToken = res.data.nextPageToken ?? undefined;
-      if (nextToken && seenTokens.has(nextToken)) {
-        throw new Error(`Google Play returned a repeated one-time product page token: ${nextToken}`);
-      }
-      if (nextToken) seenTokens.add(nextToken);
-      pageToken = nextToken;
-    } while (pageToken);
+      return { items: res.data.oneTimeProducts, nextPageToken: res.data.nextPageToken };
+    });
 
+    // 全ページを結合済みなので、ツールの応答形式として nextPageToken は常に null を返す。
     return {
       oneTimeProducts,
       nextPageToken: null,

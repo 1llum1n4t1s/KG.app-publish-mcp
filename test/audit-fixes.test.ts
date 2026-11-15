@@ -554,7 +554,7 @@ test('google_update_iap merges a listing update without dropping other locales o
   assert.equal(updatedProduct.defaultLanguage, undefined);
 });
 
-test('Apple client applies abort deadlines to API requests and both upload paths', async t => {
+test('Apple client applies abort deadlines to API requests and upload operations', async t => {
   const directory = mkdtempSync(join(tmpdir(), 'app-publish-timeout-'));
   t.after(() => rmSync(directory, { recursive: true, force: true }));
   const uploadPath = join(directory, 'upload.bin');
@@ -574,11 +574,66 @@ test('Apple client applies abort deadlines to API requests and both upload paths
   });
 
   await client.request('/apps');
-  await client.upload('https://uploads.example/file', uploadPath, 'application/octet-stream');
   await client.uploadOperation({ method: 'PUT', url: 'https://uploads.example/chunk' }, uploadPath);
 
-  assert.equal(signals.length, 3);
+  assert.equal(signals.length, 2);
   assert.equal(signals.every(signal => !signal.aborted), true);
+});
+
+test('offer code tools send per-territory prices as JSON:API references and included resources', async () => {
+  // 送信 body は JSON.stringify されるため、キー順を含めた文字列で固定する。
+  const prices = [{ territoryId: 'USA', pricePointId: 'pp-1' }, { territoryId: 'JPN', pricePointId: 'pp-2' }];
+  const cases = [
+    {
+      name: 'apple_create_subscription_offer_code',
+      args: { subscriptionId: 'sub', name: 'n', customerEligibilities: ['NEW'], offerEligibility: 'STACK_WITH_INTRO_OFFERS', duration: 'ONE_MONTH', offerMode: 'FREE_TRIAL', numberOfPeriods: 1, prices },
+      path: '/subscriptionOfferCodes',
+      body: {
+        data: {
+          type: 'subscriptionOfferCodes',
+          attributes: { name: 'n', customerEligibilities: ['NEW'], offerEligibility: 'STACK_WITH_INTRO_OFFERS', duration: 'ONE_MONTH', offerMode: 'FREE_TRIAL', numberOfPeriods: 1 },
+          relationships: {
+            subscription: { data: { type: 'subscriptions', id: 'sub' } },
+            prices: { data: [{ type: 'subscriptionOfferCodePrices', id: 'price-0' }, { type: 'subscriptionOfferCodePrices', id: 'price-1' }] },
+          },
+        },
+        included: [
+          { type: 'subscriptionOfferCodePrices', id: 'price-0', relationships: { territory: { data: { type: 'territories', id: 'USA' } }, subscriptionPricePoint: { data: { type: 'subscriptionPricePoints', id: 'pp-1' } } } },
+          { type: 'subscriptionOfferCodePrices', id: 'price-1', relationships: { territory: { data: { type: 'territories', id: 'JPN' } }, subscriptionPricePoint: { data: { type: 'subscriptionPricePoints', id: 'pp-2' } } } },
+        ],
+      },
+    },
+    {
+      name: 'apple_create_iap_offer_code',
+      args: { iapId: 'iap', name: 'n', customerEligibilities: ['NON_SPENDER'], prices },
+      path: '/inAppPurchaseOfferCodes',
+      body: {
+        data: {
+          type: 'inAppPurchaseOfferCodes',
+          attributes: { name: 'n', customerEligibilities: ['NON_SPENDER'] },
+          relationships: {
+            inAppPurchase: { data: { type: 'inAppPurchases', id: 'iap' } },
+            prices: { data: [{ type: 'inAppPurchaseOfferPrices', id: 'price-0' }, { type: 'inAppPurchaseOfferPrices', id: 'price-1' }] },
+          },
+        },
+        included: [
+          { type: 'inAppPurchaseOfferPrices', id: 'price-0', relationships: { territory: { data: { type: 'territories', id: 'USA' } }, pricePoint: { data: { type: 'inAppPurchasePricePoints', id: 'pp-1' } } } },
+          { type: 'inAppPurchaseOfferPrices', id: 'price-1', relationships: { territory: { data: { type: 'territories', id: 'JPN' } }, pricePoint: { data: { type: 'inAppPurchasePricePoints', id: 'pp-2' } } } },
+        ],
+      },
+    },
+  ];
+
+  for (const expected of cases) {
+    const tool = appleTools.find(candidate => candidate.name === expected.name);
+    assert.ok(tool);
+    const calls: Array<{ path: string; options?: any }> = [];
+    await tool.handler({ request: async (path: string, options?: any) => { calls.push({ path, options }); return {}; } } as any, expected.args);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].path, expected.path);
+    assert.equal(calls[0].options.method, 'POST');
+    assert.equal(JSON.stringify(calls[0].options.body), JSON.stringify(expected.body));
+  }
 });
 
 test('apple_update_review_detail creates review details after a 404 relationship lookup', async () => {
@@ -733,6 +788,24 @@ test('Google catalog list methods merge every API page', async () => {
   assert.deepEqual(iapTokens, [undefined, 'iap-next']);
   assert.deepEqual(subscriptionTokens, [undefined, 'sub-next']);
   assert.deepEqual(oneTimeTokens, [undefined, 'one-next']);
+
+  // 同じページトークンが再び返った場合は、無限ループせず対象名入りのエラーで止まる。
+  const looping = mockGoogleClient({
+    inappproducts: { list: async () => ({ data: { inappproduct: [], tokenPagination: { nextPageToken: 'same' } } }) },
+    monetization: {
+      subscriptions: { list: async () => ({ data: { subscriptions: [], nextPageToken: 'same' } }) },
+      onetimeproducts: { list: async () => ({ data: { oneTimeProducts: [], nextPageToken: 'same' } }) },
+    },
+  });
+  await assert.rejects(looping.listInAppProducts('com.example.app'), {
+    message: 'Google Play returned a repeated in-app product page token: same',
+  });
+  await assert.rejects(looping.listSubscriptions('com.example.app'), {
+    message: 'Google Play returned a repeated subscription page token: same',
+  });
+  await assert.rejects(looping.listOneTimeProducts('com.example.app'), {
+    message: 'Google Play returned a repeated one-time product page token: same',
+  });
 });
 
 test('Google listing updates use PATCH so omitted listing fields are preserved by the API', async () => {
