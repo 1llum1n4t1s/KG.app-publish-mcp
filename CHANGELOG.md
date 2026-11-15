@@ -1,4 +1,9 @@
 # 変更履歴
+## 1.0.7 — 2026-11-15
+
+- `auth google` のメッセージと Google 認証のブラウザー画面を 9 言語（日本語・英語・簡体字中国語・繁体字中国語・韓国語・スペイン語・フランス語・ドイツ語・ブラジルポルトガル語）に対応し、`APP_PUBLISH_MCP_LANGUAGE` などで切り替えられるようにしました。MCP ツールの説明は英語のままです。
+- README を英語版に合わせて 9 言語（`README.ja.md`・`README.zh-CN.md`・`README.zh-TW.md`・`README.ko.md`・`README.es.md`・`README.fr.md`・`README.de.md`・`README.pt-BR.md`）へ更新・追加し、`README.zh.md` を `README.zh-CN.md` へ改名しました。
+
 ## 1.0.6 — 2026-11-15
 
 - App Store Connect の認証トークンの有効期限を19分にし、20分ちょうどで認証が拒否される問題を回避しました。
