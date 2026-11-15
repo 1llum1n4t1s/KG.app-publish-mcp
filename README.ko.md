@@ -8,8 +8,7 @@
 
 ## 사용 시나리오
 
-**Node.js 22 이상**이 필요합니다. 이전 런타임을 사용 중이라면 설치하거나 업데이트하기 전에
-Node.js를 업그레이드하세요.
+**Bun 1.4.4 이상**이 필요합니다. 서버를 실행하거나 업데이트하기 전에 Bun을 설치하거나 업그레이드하세요.
 
 다음과 같은 경우에 이 MCP를 사용합니다.
 
@@ -92,18 +91,15 @@ Node.js를 업그레이드하세요.
 
 ### 1. npm에서 실행
 
-로컬 clone이나 설치는 필요 없습니다. 아래 MCP 클라이언트 설정이 `npx`로 npm의 최신 릴리스를 실행합니다.
-
-이미 버전을 고정해서(예: `@kagayoi/app-publish-mcp@1.0.5`) 서버를 등록했다면, 해당 등록의 패키지 인수를 `@kagayoi/app-publish-mcp@latest`로 바꾸세요. README를 업데이트해도 기존 등록은 바뀌지 않지만, 이렇게 수정한 뒤에는 실행할 때마다 자동으로 최신 릴리스가 사용됩니다.
-
-Node.js 대신 Bun으로 실행하려면 `bunx --bun`과 같은 패키지 이름을 사용하세요.
+로컬 clone이나 설치는 필요 없습니다. 아래 MCP 클라이언트 설정이 Bun으로 npm의 최신 릴리스를 실행합니다.
 
 ```sh
-bunx --bun @kagayoi/app-publish-mcp@latest
+bun x --bun @kagayoi/app-publish-mcp@latest
 ```
 
-MCP 클라이언트 설정에서는 명령으로 `bunx`를, 인수로
-`["--bun", "@kagayoi/app-publish-mcp@latest"]`를 사용하세요.
+MCP 클라이언트 설정에서는 명령으로 `bun`을, 인수로 `["x", "--bun", "@kagayoi/app-publish-mcp@latest"]`를 사용하세요. `bunx`는 `bun x`의 별칭입니다. `npx`나 Node.js로 서버를 실행하는 것은 지원하지 않습니다. `@latest`는 최신 릴리스를 사용합니다.
+
+이전에 `npx`로, 또는 버전을 고정해서(예: `@kagayoi/app-publish-mcp@1.0.5`) 서버를 등록했다면 해당 등록을 변경하세요. 명령은 `bun`으로, 인수는 `["x", "--bun", "@kagayoi/app-publish-mcp@latest"]`로 바꿉니다. README를 업데이트해도 기존 등록은 바뀌지 않습니다.
 
 ### 2. Apple 자격 증명
 
@@ -128,10 +124,8 @@ MCP 클라이언트 설정에서는 명령으로 `bunx`를, 인수로
 터미널 환경에 `GOOGLE_CLIENT_ID`와 `GOOGLE_CLIENT_SECRET`을 설정한 뒤 다음을 실행하세요.
 
 ```sh
-npx --yes @kagayoi/app-publish-mcp@latest auth google
+bun x --bun @kagayoi/app-publish-mcp@latest auth google
 ```
-
-Bun을 사용한다면 대신 `bunx --bun @kagayoi/app-publish-mcp@latest auth google`을 실행하세요.
 
 브라우저 로그인은 같은 컴퓨터에서 완료해야 합니다. 이 명령은
 `127.0.0.1:19847`에서 대기하며 자격 증명을 `~/.app-publish-mcp/google.json`에 저장합니다.
@@ -159,8 +153,8 @@ AI 어시스턴트에 반환되는 MCP 도구 설명과 오류는 영어로 유�
 {
   "mcpServers": {
     "app-publish-mcp": {
-      "command": "npx",
-      "args": ["--yes", "@kagayoi/app-publish-mcp@latest"],
+      "command": "bun",
+      "args": ["x", "--bun", "@kagayoi/app-publish-mcp@latest"],
       "env": {
         "APPLE_KEY_ID": "${APPLE_KEY_ID}",
         "APPLE_ISSUER_ID": "${APPLE_ISSUER_ID}",

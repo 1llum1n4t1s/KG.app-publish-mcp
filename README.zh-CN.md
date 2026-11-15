@@ -8,8 +8,7 @@
 
 ## 适用场景
 
-需要 **Node.js 22 或更高版本**。如果当前运行时版本较旧，请先升级 Node.js，
-再进行安装或更新。
+需要 **Bun 1.4.4 或更高版本**。运行或更新服务器之前，请先安装或升级 Bun。
 
 在以下情况下可以使用此 MCP：
 
@@ -92,18 +91,15 @@
 
 ### 1. 从 npm 运行
 
-无需本地克隆或安装。下面的 MCP 客户端配置会通过 `npx` 运行 npm 上的最新版本。
-
-如果你已经以固定版本（例如 `@kagayoi/app-publish-mcp@1.0.5`）注册了该服务器，请将注册信息中的包参数改为 `@kagayoi/app-publish-mcp@latest`。更新本 README 不会改变已有的注册信息，但修改之后，每次启动都会自动使用最新版本。
-
-如需使用 Bun 而不是 Node.js 运行，请使用 `bunx --bun` 和相同的包名：
+无需本地克隆或安装。下面的 MCP 客户端配置会通过 Bun 运行 npm 上的最新版本：
 
 ```sh
-bunx --bun @kagayoi/app-publish-mcp@latest
+bun x --bun @kagayoi/app-publish-mcp@latest
 ```
 
-在 MCP 客户端配置中，将 `bunx` 作为命令，将
-`["--bun", "@kagayoi/app-publish-mcp@latest"]` 作为其参数。
+在 MCP 客户端配置中，将 `bun` 作为命令，将 `["x", "--bun", "@kagayoi/app-publish-mcp@latest"]` 作为其参数。`bunx` 是 `bun x` 的别名。不支持使用 `npx` 或 Node.js 运行该服务器。`@latest` 表示使用最新版本。
+
+如果你之前通过 `npx` 或以固定版本（例如 `@kagayoi/app-publish-mcp@1.0.5`）注册了该服务器，请修改该注册信息：将命令改为 `bun`，将参数改为 `["x", "--bun", "@kagayoi/app-publish-mcp@latest"]`。更新本 README 不会改变已有的注册信息。
 
 ### 2. Apple 凭据
 
@@ -128,10 +124,8 @@ bunx --bun @kagayoi/app-publish-mcp@latest
 `GOOGLE_CLIENT_ID` 和 `GOOGLE_CLIENT_SECRET`，然后运行：
 
 ```sh
-npx --yes @kagayoi/app-publish-mcp@latest auth google
+bun x --bun @kagayoi/app-publish-mcp@latest auth google
 ```
-
-使用 Bun 时，请改为运行 `bunx --bun @kagayoi/app-publish-mcp@latest auth google`。
 
 请在同一台计算机上完成浏览器登录。该命令会监听
 `127.0.0.1:19847`，并将凭据保存到 `~/.app-publish-mcp/google.json`。
@@ -160,8 +154,8 @@ npx --yes @kagayoi/app-publish-mcp@latest auth google
 {
   "mcpServers": {
     "app-publish-mcp": {
-      "command": "npx",
-      "args": ["--yes", "@kagayoi/app-publish-mcp@latest"],
+      "command": "bun",
+      "args": ["x", "--bun", "@kagayoi/app-publish-mcp@latest"],
       "env": {
         "APPLE_KEY_ID": "${APPLE_KEY_ID}",
         "APPLE_ISSUER_ID": "${APPLE_ISSUER_ID}",

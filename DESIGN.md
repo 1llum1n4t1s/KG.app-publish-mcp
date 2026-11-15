@@ -4,7 +4,7 @@
 
 `@kagayoi/app-publish-mcp` exposes App Store Connect and Google Play Console
 operations through a single Model Context Protocol server. It runs over stdio,
-is distributed as an npm executable, and lets an MCP client use either platform
+is distributed through the npm registry as a Bun executable (`#!/usr/bin/env bun`), and lets an MCP client use either platform
 independently according to the credentials available at process startup.
 
 ## Components and boundaries
@@ -13,13 +13,14 @@ independently according to the credentials available at process startup.
 | --- | --- | --- |
 | `src/cli.ts` | Selects MCP server startup or `auth google` | Contains no platform API logic |
 | `src/index.ts` | Builds the MCP server; registers tools, two prompts, and two resources; adapts results and errors to MCP content | Owns stdio and common MCP behavior |
+| `src/tool-def.ts` | Declares the `ToolDef<C>` shape shared by both platform registries | Type only; no runtime code |
 | `src/apple/tools.ts` / `src/google/tools.ts` | Define Zod input schemas, tool names/descriptions, and operation handlers | Handlers depend on their platform client rather than transport or credentials |
 | `src/apple/client.ts` | Creates short-lived ES256 App Store Connect JWTs and performs Apple API requests/uploads | Reads the configured `.p8` file locally; does not own MCP formatting |
 | `src/google/client.ts` | Configures the Android Publisher v3 client and implements Google API operations | Accepts a service account or OAuth refresh credentials |
 | `src/google/errors.ts` | Provides the not-configured message and formats Google API failures (HTTP status plus a selected subset of the response payload) | Pure helpers; no API calls |
 | `src/auth.ts` | Runs interactive Google OAuth through a localhost callback and stores the refresh credentials | Writes only to the per-user `~/.app-publish-mcp/google.json` store |
 | `src/i18n.ts` + `src/locales/<tag>.json` | Resolves the display language and returns human-readable messages in nine languages (CLI output, startup diagnostics, the OAuth browser page) | Excludes MCP tool names, descriptions, schemas and errors returned to the AI assistant, which stay English; store-listing `locale`/`languageCode` arguments are API data, not UI language |
-| Package and registry metadata | Defines npm execution and discovery through MCP registries/marketplaces | The npm tarball contains compiled `dist` (including `dist/locales`), `package.json`, `LICENSE` and `README.md` |
+| Package and registry metadata | Defines npm execution and discovery through MCP registries/marketplaces | The npm tarball contains compiled `dist` (including `dist/locales`), `package.json`, `LICENSE`, `README.md` and the translated `README.<lang>.md` files |
 
 The tool registries currently provide 71 Apple tools and 47 Google tools. The
 server also exposes `app_release_checklist` and `app_store_optimization` prompts,
@@ -27,7 +28,7 @@ plus `app-publish://config` and `app-publish://supported-platforms` resources.
 
 ## Runtime data flow
 
-1. An MCP host starts `app-publish-mcp` (through `npx` or `bunx --bun`) and communicates
+1. An MCP host starts `app-publish-mcp` (through `bun x --bun @kagayoi/app-publish-mcp@latest`; `bunx` is an alias of `bun x`) and communicates
    with it over stdin/stdout.
 2. Module initialization reads package metadata and credential-related environment
    variables, then creates the available platform clients.
@@ -79,8 +80,9 @@ enforces this. User-facing language selection is documented in
 ## Authentication model
 
 - Apple is connected only when `APPLE_KEY_ID`, `APPLE_ISSUER_ID`, and
-  `APPLE_P8_PATH` are all present. JWTs live for 20 minutes and are reused until
-  one minute before expiration. `APPLE_VENDOR_NUMBER` is optional.
+  `APPLE_P8_PATH` are all present. JWTs live for 19 minutes (App Store Connect
+  rejects exactly 20) and are reused until one minute before expiration.
+  `APPLE_VENDOR_NUMBER` is optional.
 - Google chooses credentials in this order: `GOOGLE_SERVICE_ACCOUNT_PATH`; the
   complete `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` +
   `GOOGLE_REFRESH_TOKEN` set; then the saved per-user OAuth token file. A partial
@@ -98,25 +100,34 @@ enforces this. User-facing language selection is documented in
 
 `.github/workflows/npm-publish.yml` runs on pushes to `release/**` or manual
 dispatch. On a release branch it checks the branch suffix against the package
-version, then installs the lockfile dependencies and builds before packaging.
+version, then installs the `bun.lock` dependencies and builds before packaging.
 Manual dispatch on other branches does not run that version-name check.
 
 The workflow runs `bun pm pack` and passes the tarball to
 `scripts/verify-bun-package.ps1`. The verifier checks archived entry types,
-names, duplicates, expected file bytes, the CLI executable mode, manifest
+names, duplicates, expected file bytes, the CLI executable mode and bun shebang, manifest
 fields, version consistency and the archive SHA-512. Publication uses that same
 verified tarball rather than repacking the working tree.
 
 The workflow checks out the exact release commit with native git and a temporary
 HTTP authorization header. The workflow downloads the official Bun 1.4.4 Linux
 archive and checks its pinned SHA-256 before installation. Checkout and
-toolchain setup do not use Node-based Actions. The npm lockfile remains the
-dependency source; Bun migrates it in memory during installation.
+toolchain setup do not use Node-based Actions. `bun.lock` (text lockfile) is the
+dependency source; `package-lock.json` is no longer maintained.
 
 Publication keeps npm Trusted Publishing (GitHub OIDC). The npm-publish.yml
 workflow runs install, build, pack, verification and publication on GitHub-hosted
 ubuntu-latest to meet the cloud-hosted build requirement for npm provenance.
-Normal dependency validation also runs on GitHub-hosted ubuntu-latest. The verified
+Normal dependency validation also runs on GitHub-hosted ubuntu-latest with the same
+pinned Bun: it runs lint, tests, the stdio test, `bun pm pack` with
+`scripts/verify-bun-package.ps1`, and `scripts/verify-packaged-bun.mjs`, which installs
+the tarball with `bun add` and starts the `.bin` shim as a user would, compares the
+discovered tools with the README, and runs the Apple review fixture with outbound
+network blocked by `test/fixtures/network-guard.mjs`. The guard cannot block `Bun.fetch`,
+UDP, WebSocket or `node-fetch` (Bun replaces it with its built-in fetch); the product's own
+paths (Apple `fetch`, Google's authenticated gaxios 8.x) are blocked, but the
+unauthenticated gaxios 7.x branch under googleapis-common would bypass it. That install resolves ranges from the registry,
+so its dependency versions can differ from `bun.lock`. The verified
 SHA-512 and manifest are checked before publishing the same archive without
 repacking. No saved npm publication token is used.
 The native C# publisher exchanges GitHub OIDC for a package-specific short-lived
@@ -154,7 +165,7 @@ validation suite.
 
 ## Adopted design decisions
 
-- **stdio plus npm/npx distribution:** works with MCP hosts without running a
+- **stdio plus npm registry / `bun x` distribution (Bun only):** works with MCP hosts without running a
   persistent web service. Each host owns process lifetime and credentials.
 - **Declarative Zod-backed tool registries:** keeps discovery metadata, validation,
   and handlers together while sharing registration/error handling. The trade-off

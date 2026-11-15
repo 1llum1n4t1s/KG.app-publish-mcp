@@ -14,9 +14,7 @@
     "start": "bun --no-env-file --no-install dist/index.js",
     "lint": "bun --no-env-file --no-install --bun run tsc --noEmit",
     "test": "bun --no-env-file --no-install test test/google-app-signing.test.ts test/audit-fixes.test.ts test/localization.test.ts",
-    "test:node": "tsx --test test/google-app-signing.test.ts test/audit-fixes.test.ts test/localization.test.ts",
-    "test:stdio": "bun --no-env-file --no-install --bun run build && bun --no-env-file --no-install test test/submission-stdio.test.mjs",
-    "test:stdio:node": "node node_modules/typescript/bin/tsc && node --test test/submission-stdio.test.mjs"
+    "test:stdio": "bun --no-env-file --no-install --bun run build && bun --no-env-file --no-install test test/submission-stdio.test.mjs"
   },
   "keywords": [
     "mcp",
@@ -46,7 +44,7 @@
     "url": "https://github.com/1llum1n4t1s/KG.app-publish-mcp/issues"
   },
   "engines": {
-    "node": ">=22"
+    "bun": ">=1.4.4"
   },
   "files": [
     "dist/**/*",
@@ -55,15 +53,14 @@
   ],
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
-    "google-auth-library": "^11.3.2",
-    "googleapis": "^189.0.0",
+    "google-auth-library": "^11.3.4",
+    "googleapis": "^190.0.0",
     "jsonwebtoken": "^9.0.3",
     "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^26.6.6",
-    "tsx": "^4.23.15",
     "typescript": "^7.0.2"
   }
 }

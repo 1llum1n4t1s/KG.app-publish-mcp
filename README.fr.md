@@ -8,8 +8,7 @@ Un serveur [MCP (Model Context Protocol)](https://modelcontextprotocol.io) unifi
 
 ## Cas d'usage
 
-Nécessite **Node.js 22 ou version ultérieure**. Mettez Node.js à jour avant
-d'installer ou de mettre à jour le paquet depuis une version plus ancienne.
+Nécessite **Bun 1.4.4 ou version ultérieure**. Installez ou mettez à jour Bun avant d'exécuter ou de mettre à jour le serveur.
 
 Utilisez ce MCP lorsque vous devez :
 
@@ -92,18 +91,15 @@ Utilisez ce MCP lorsque vous devez :
 
 ### 1. Exécution depuis npm
 
-Aucun clonage local ni installation n'est nécessaire. La configuration du client MCP ci-dessous exécute la dernière version publiée sur npm avec `npx`.
-
-Si vous avez déjà enregistré le serveur avec une version figée (par exemple `@kagayoi/app-publish-mcp@1.0.5`), remplacez l'argument du paquet dans cet enregistrement par `@kagayoi/app-publish-mcp@latest`. La mise à jour de ce README ne modifie pas les enregistrements existants, mais après cette modification chaque lancement utilise automatiquement la dernière version.
-
-Pour exécuter avec Bun au lieu de Node.js, utilisez `bunx --bun` et le même nom de paquet :
+Aucun clonage local ni installation n'est nécessaire. La configuration du client MCP ci-dessous exécute la dernière version publiée sur npm avec Bun :
 
 ```sh
-bunx --bun @kagayoi/app-publish-mcp@latest
+bun x --bun @kagayoi/app-publish-mcp@latest
 ```
 
-Dans la configuration d'un client MCP, utilisez `bunx` comme commande et
-`["--bun", "@kagayoi/app-publish-mcp@latest"]` comme arguments.
+Dans la configuration d'un client MCP, utilisez `bun` comme commande et `["x", "--bun", "@kagayoi/app-publish-mcp@latest"]` comme arguments. `bunx` est un alias de `bun x`. L'exécution du serveur avec `npx` ou Node.js n'est pas prise en charge. `@latest` utilise la dernière version.
+
+Si vous avez déjà enregistré le serveur avec `npx`, ou avec une version figée (par exemple `@kagayoi/app-publish-mcp@1.0.5`), modifiez cet enregistrement : définissez la commande sur `bun` et les arguments sur `["x", "--bun", "@kagayoi/app-publish-mcp@latest"]`. La mise à jour de ce README ne modifie pas les enregistrements existants.
 
 ### 2. Identifiants Apple
 
@@ -128,10 +124,8 @@ que Google ; omettez les variables d'identifiants de l'autre plateforme.
 `GOOGLE_CLIENT_ID` et `GOOGLE_CLIENT_SECRET` dans l'environnement de votre terminal, puis exécutez :
 
 ```sh
-npx --yes @kagayoi/app-publish-mcp@latest auth google
+bun x --bun @kagayoi/app-publish-mcp@latest auth google
 ```
-
-Avec Bun, exécutez plutôt `bunx --bun @kagayoi/app-publish-mcp@latest auth google`.
 
 Terminez la connexion dans le navigateur sur le même ordinateur. La commande écoute
 sur `127.0.0.1:19847` et enregistre les identifiants dans `~/.app-publish-mcp/google.json`.
@@ -162,8 +156,8 @@ Code ; supprimez les entrées d'une plateforme ou d'une méthode d'authentificat
 {
   "mcpServers": {
     "app-publish-mcp": {
-      "command": "npx",
-      "args": ["--yes", "@kagayoi/app-publish-mcp@latest"],
+      "command": "bun",
+      "args": ["x", "--bun", "@kagayoi/app-publish-mcp@latest"],
       "env": {
         "APPLE_KEY_ID": "${APPLE_KEY_ID}",
         "APPLE_ISSUER_ID": "${APPLE_ISSUER_ID}",

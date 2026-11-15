@@ -1,6 +1,6 @@
 FROM oven/bun:1.4.4-alpine
 WORKDIR /app
-COPY package.json package-lock.json ./
+COPY package.json bun.lock ./
 RUN bun install --network-concurrency=4 --frozen-lockfile --production
 COPY dist/ ./dist/
 ENTRYPOINT ["bun", "--no-install", "--no-env-file", "dist/index.js"]

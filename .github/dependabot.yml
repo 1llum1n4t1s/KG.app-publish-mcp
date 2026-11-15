@@ -35,7 +35,7 @@ updates:
       - patch
   commit-message:
     prefix: deps
-- package-ecosystem: npm
+- package-ecosystem: bun
   directory: /
   schedule:
     interval: weekly

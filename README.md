@@ -8,8 +8,7 @@ A unified [MCP (Model Context Protocol)](https://modelcontextprotocol.io) server
 
 ## When to Use
 
-Requires **Node.js 22 or later**. Upgrade Node.js before installing or updating
-from an older runtime.
+Requires **Bun 1.4.4 or later**. Install or upgrade Bun before running or updating the server.
 
 Use this MCP when you need to:
 
@@ -92,18 +91,15 @@ Use this MCP when you need to:
 
 ### 1. Run from npm
 
-No local clone or installation is required. The MCP client configuration below runs the latest npm release with `npx`.
-
-If you already registered the server with a pinned version (for example `@kagayoi/app-publish-mcp@1.0.5`), change the package argument in that registration to `@kagayoi/app-publish-mcp@latest`. Updating this README does not change existing registrations, but after that edit each launch uses the latest release automatically.
-
-To run with Bun instead of Node.js, use `bunx --bun` and the same package name:
+No local clone or installation is required. The MCP client configuration below runs the latest npm release with Bun:
 
 ```sh
-bunx --bun @kagayoi/app-publish-mcp@latest
+bun x --bun @kagayoi/app-publish-mcp@latest
 ```
 
-In an MCP client configuration, use `bunx` as the command and
-`["--bun", "@kagayoi/app-publish-mcp@latest"]` as its arguments.
+In an MCP client configuration, use `bun` as the command and `["x", "--bun", "@kagayoi/app-publish-mcp@latest"]` as its arguments. `bunx` is an alias of `bun x`. Running the server with `npx` or Node.js is not supported. `@latest` uses the latest release.
+
+If you registered the server earlier with `npx`, or with a pinned version (for example `@kagayoi/app-publish-mcp@1.0.5`), change that registration: set the command to `bun` and the arguments to `["x", "--bun", "@kagayoi/app-publish-mcp@latest"]`. Updating this README does not change existing registrations.
 
 ### 2. Apple Credentials
 
@@ -128,10 +124,8 @@ omit the other platform's credential variables.
 `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in your terminal environment, then run:
 
 ```sh
-npx --yes @kagayoi/app-publish-mcp@latest auth google
+bun x --bun @kagayoi/app-publish-mcp@latest auth google
 ```
-
-With Bun, run `bunx --bun @kagayoi/app-publish-mcp@latest auth google` instead.
 
 Complete the browser sign-in on the same computer. The command listens on
 `127.0.0.1:19847` and saves credentials to `~/.app-publish-mcp/google.json`.
@@ -162,8 +156,8 @@ Code; remove entries for a platform or authentication method you do not use.
 {
   "mcpServers": {
     "app-publish-mcp": {
-      "command": "npx",
-      "args": ["--yes", "@kagayoi/app-publish-mcp@latest"],
+      "command": "bun",
+      "args": ["x", "--bun", "@kagayoi/app-publish-mcp@latest"],
       "env": {
         "APPLE_KEY_ID": "${APPLE_KEY_ID}",
         "APPLE_ISSUER_ID": "${APPLE_ISSUER_ID}",

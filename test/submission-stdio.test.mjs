@@ -4,10 +4,8 @@ import { test } from 'node:test';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
-const preload = path => {
-  const url = new URL(path, import.meta.url);
-  return process.versions.bun ? fileURLToPath(url) : url.href;
-};
+// Bun の --import（--preload の別名）にはファイルパスを渡す（Node 用の file URL 形式は使わない）。
+const preload = path => fileURLToPath(new URL(path, import.meta.url));
 
 for (const lostResponse of [false, true]) {
   test(`ビルド済みstdio: 4項目の提出と再実行（応答喪失=${lostResponse}）`, { timeout: 30_000 }, async () => {

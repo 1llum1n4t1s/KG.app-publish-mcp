@@ -1,9 +1,9 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 /**
  * Interactive OAuth flow for Google Play Console.
  *
  * Usage:
- *   npx app-publish-mcp auth google
+ *   bun x --bun @kagayoi/app-publish-mcp@latest auth google
  *
  * Opens browser → user logs in → tokens saved to ~/.app-publish-mcp/google.json
  * The MCP server auto-loads this file on startup.

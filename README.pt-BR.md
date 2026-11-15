@@ -8,8 +8,7 @@ Um servidor [MCP (Model Context Protocol)](https://modelcontextprotocol.io) unif
 
 ## Quando usar
 
-Requer **Node.js 22 ou posterior**. Atualize o Node.js antes de instalar ou atualizar
-a partir de um runtime mais antigo.
+Requer **Bun 1.4.4 ou posterior**. Instale ou atualize o Bun antes de executar ou atualizar o servidor.
 
 Use este MCP quando precisar:
 
@@ -92,18 +91,15 @@ Use este MCP quando precisar:
 
 ### 1. Executar a partir do npm
 
-Não é necessário clonar nem instalar nada localmente. A configuração do cliente MCP abaixo executa a versão mais recente publicada no npm com `npx`.
-
-Se você já registrou o servidor com uma versão fixa (por exemplo, `@kagayoi/app-publish-mcp@1.0.5`), altere o argumento do pacote nesse registro para `@kagayoi/app-publish-mcp@latest`. Atualizar este README não altera os registros existentes, mas, depois dessa edição, cada inicialização usará automaticamente a versão mais recente.
-
-Para executar com Bun em vez de Node.js, use `bunx --bun` e o mesmo nome de pacote:
+Não é necessário clonar nem instalar nada localmente. A configuração do cliente MCP abaixo executa a versão mais recente publicada no npm com o Bun:
 
 ```sh
-bunx --bun @kagayoi/app-publish-mcp@latest
+bun x --bun @kagayoi/app-publish-mcp@latest
 ```
 
-Na configuração de um cliente MCP, use `bunx` como comando e
-`["--bun", "@kagayoi/app-publish-mcp@latest"]` como argumentos.
+Na configuração de um cliente MCP, use `bun` como comando e `["x", "--bun", "@kagayoi/app-publish-mcp@latest"]` como argumentos. `bunx` é um alias de `bun x`. Não há suporte para executar o servidor com `npx` ou Node.js. `@latest` usa a versão mais recente.
+
+Se você já registrou o servidor com `npx` ou com uma versão fixa (por exemplo, `@kagayoi/app-publish-mcp@1.0.5`), altere esse registro: defina o comando como `bun` e os argumentos como `["x", "--bun", "@kagayoi/app-publish-mcp@latest"]`. Atualizar este README não altera os registros existentes.
 
 ### 2. Credenciais da Apple
 
@@ -128,10 +124,8 @@ omita as variáveis de credenciais da outra plataforma.
 `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET` no ambiente do seu terminal e execute:
 
 ```sh
-npx --yes @kagayoi/app-publish-mcp@latest auth google
+bun x --bun @kagayoi/app-publish-mcp@latest auth google
 ```
-
-Com o Bun, execute `bunx --bun @kagayoi/app-publish-mcp@latest auth google` no lugar.
 
 Conclua o login no navegador no mesmo computador. O comando escuta em
 `127.0.0.1:19847` e salva as credenciais em `~/.app-publish-mcp/google.json`.
@@ -162,8 +156,8 @@ Code; remova as entradas de uma plataforma ou de um método de autenticação qu
 {
   "mcpServers": {
     "app-publish-mcp": {
-      "command": "npx",
-      "args": ["--yes", "@kagayoi/app-publish-mcp@latest"],
+      "command": "bun",
+      "args": ["x", "--bun", "@kagayoi/app-publish-mcp@latest"],
       "env": {
         "APPLE_KEY_ID": "${APPLE_KEY_ID}",
         "APPLE_ISSUER_ID": "${APPLE_ISSUER_ID}",

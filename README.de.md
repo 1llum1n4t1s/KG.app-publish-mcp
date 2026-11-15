@@ -8,8 +8,7 @@ Ein einheitlicher [MCP-Server (Model Context Protocol)](https://modelcontextprot
 
 ## Einsatzszenarien
 
-Erfordert **Node.js 22 oder neuer**. Aktualisieren Sie Node.js, bevor Sie das Paket
-von einer älteren Laufzeitumgebung aus installieren oder aktualisieren.
+Erfordert **Bun 1.4.4 oder neuer**. Installieren oder aktualisieren Sie Bun, bevor Sie den Server ausführen oder aktualisieren.
 
 Verwenden Sie diesen MCP, wenn Sie Folgendes tun möchten:
 
@@ -92,18 +91,15 @@ Verwenden Sie diesen MCP, wenn Sie Folgendes tun möchten:
 
 ### 1. Über npm ausführen
 
-Ein lokaler Klon oder eine Installation ist nicht erforderlich. Die untenstehende MCP-Client-Konfiguration führt mit `npx` das neueste npm-Release aus.
-
-Wenn Sie den Server bereits mit einer festen Version registriert haben (zum Beispiel `@kagayoi/app-publish-mcp@1.0.5`), ändern Sie das Paketargument in dieser Registrierung auf `@kagayoi/app-publish-mcp@latest`. Die Aktualisierung dieser README ändert bestehende Registrierungen nicht, aber nach dieser Anpassung verwendet jeder Start automatisch das neueste Release.
-
-Um stattdessen mit Bun statt Node.js zu starten, verwenden Sie `bunx --bun` und denselben Paketnamen:
+Ein lokaler Klon oder eine Installation ist nicht erforderlich. Die untenstehende MCP-Client-Konfiguration führt mit Bun das neueste npm-Release aus:
 
 ```sh
-bunx --bun @kagayoi/app-publish-mcp@latest
+bun x --bun @kagayoi/app-publish-mcp@latest
 ```
 
-Verwenden Sie in einer MCP-Client-Konfiguration `bunx` als Befehl und
-`["--bun", "@kagayoi/app-publish-mcp@latest"]` als Argumente.
+Verwenden Sie in einer MCP-Client-Konfiguration `bun` als Befehl und `["x", "--bun", "@kagayoi/app-publish-mcp@latest"]` als Argumente. `bunx` ist ein Alias für `bun x`. Der Start des Servers mit `npx` oder Node.js wird nicht unterstützt. `@latest` verwendet das neueste Release.
+
+Wenn Sie den Server bereits mit `npx` oder mit einer festen Version registriert haben (zum Beispiel `@kagayoi/app-publish-mcp@1.0.5`), ändern Sie diese Registrierung: Setzen Sie den Befehl auf `bun` und die Argumente auf `["x", "--bun", "@kagayoi/app-publish-mcp@latest"]`. Die Aktualisierung dieser README ändert bestehende Registrierungen nicht.
 
 ### 2. Apple-Zugangsdaten
 
@@ -128,10 +124,8 @@ konfigurieren; lassen Sie die Zugangsdaten-Variablen der jeweils anderen Plattfo
 `GOOGLE_CLIENT_ID` und `GOOGLE_CLIENT_SECRET` in der Umgebung Ihres Terminals und führen Sie dann Folgendes aus:
 
 ```sh
-npx --yes @kagayoi/app-publish-mcp@latest auth google
+bun x --bun @kagayoi/app-publish-mcp@latest auth google
 ```
-
-Mit Bun führen Sie stattdessen `bunx --bun @kagayoi/app-publish-mcp@latest auth google` aus.
 
 Schließen Sie die Anmeldung im Browser auf demselben Computer ab. Der Befehl lauscht auf
 `127.0.0.1:19847` und speichert die Zugangsdaten in `~/.app-publish-mcp/google.json`.
@@ -162,8 +156,8 @@ Code startet; entfernen Sie Einträge für eine Plattform oder Authentifizierung
 {
   "mcpServers": {
     "app-publish-mcp": {
-      "command": "npx",
-      "args": ["--yes", "@kagayoi/app-publish-mcp@latest"],
+      "command": "bun",
+      "args": ["x", "--bun", "@kagayoi/app-publish-mcp@latest"],
       "env": {
         "APPLE_KEY_ID": "${APPLE_KEY_ID}",
         "APPLE_ISSUER_ID": "${APPLE_ISSUER_ID}",

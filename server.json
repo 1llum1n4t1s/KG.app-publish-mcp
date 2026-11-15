@@ -10,6 +10,7 @@
   "packages": [
     {
       "registryType": "npm",
+      "runtimeHint": "bunx",
       "identifier": "@kagayoi/app-publish-mcp",
       "version": "1.0.7",
       "transport": {
