@@ -16,7 +16,7 @@ for (const lostResponse of [false, true]) {
       args: ['--import', preload('./fixtures/apple-review.mjs'),
         fileURLToPath(new URL('../dist/cli.js', import.meta.url))],
       env: {
-        APPLE_KEY_ID: 'fixture', APPLE_ISSUER_ID: 'fixture', APPLE_P8_PATH: 'unused-fixture-key',
+        APP_PUBLISH_MCP_LANGUAGE: 'en', APPLE_KEY_ID: 'fixture', APPLE_ISSUER_ID: 'fixture', APPLE_P8_PATH: 'unused-fixture-key',
         GOOGLE_CLIENT_ID: 'fixture', GOOGLE_CLIENT_SECRET: 'fixture', GOOGLE_REFRESH_TOKEN: 'fixture',
         REVIEW_FIXTURE_LOST_RESPONSE: lostResponse ? '1' : '0',
       },
@@ -65,7 +65,7 @@ test('ビルド済みstdio: 同一snapshotの分割uploadと両Google価格経�
     args: ['--import', preload('./fixtures/upload-pricing.mjs'),
       fileURLToPath(new URL('../dist/cli.js', import.meta.url))],
     env: {
-      APPLE_KEY_ID: 'fixture', APPLE_ISSUER_ID: 'fixture', APPLE_P8_PATH: 'unused-fixture-key',
+      APP_PUBLISH_MCP_LANGUAGE: 'en', APPLE_KEY_ID: 'fixture', APPLE_ISSUER_ID: 'fixture', APPLE_P8_PATH: 'unused-fixture-key',
       GOOGLE_SERVICE_ACCOUNT_PATH: '', GOOGLE_CLIENT_ID: 'partial',
       GOOGLE_CLIENT_SECRET: '', GOOGLE_REFRESH_TOKEN: '',
       ...(process.env.TEMP ? { TEMP: process.env.TEMP } : {}),

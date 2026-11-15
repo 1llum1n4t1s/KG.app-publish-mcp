@@ -43,7 +43,7 @@ try {
         } finally { $reader.Dispose() }
     } finally { $gzip.Dispose() }
 } finally { $stream.Dispose() }
-foreach ($required in @('package/dist/cli.js', 'package/dist/index.js', 'package/dist/google/client.js', 'package/dist/apple/client.js', 'package/LICENSE', 'package/README.md')) {
+foreach ($required in @('package/dist/cli.js', 'package/dist/index.js', 'package/dist/google/client.js', 'package/dist/apple/client.js', 'package/dist/i18n.js', 'package/dist/locales/en.json', 'package/dist/locales/ja.json', 'package/LICENSE', 'package/README.md')) {
     if (-not $seen.Contains($required)) { throw "Archive is missing required file: $required" }
 }
 if ($seen.Count -ne $expected.Count) { throw 'Archive is missing expected files' }

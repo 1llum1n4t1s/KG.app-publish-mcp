@@ -16,6 +16,7 @@ import { randomBytes } from 'crypto';
 import fs, { writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
+import { createTranslator, detectWebLanguage, tCli } from './i18n.js';
 
 const CONFIG_DIR = join(homedir(), '.app-publish-mcp');
 const GOOGLE_TOKEN_PATH = join(CONFIG_DIR, 'google.json');
@@ -98,7 +99,7 @@ function openBrowser(url: string): void {
   const command = getBrowserOpenCommand(url);
   const child = execFile(command.file, command.args);
   child.once('error', err => {
-    console.error(`Could not open the browser automatically: ${err.message}`);
+    console.error(tCli('auth.browserOpenFailed', { message: err.message }));
   });
 }
 
@@ -128,6 +129,9 @@ export function waitForOAuthCode(
 
     const server = createServer((req, res) => {
       const url = new URL(req.url ?? '/', `http://${host}:${port}`);
+      // ブラウザーに返す画面の言語は Accept-Language で決める（ヘッダーなしは英語）。
+      const language = detectWebLanguage(req.headers['accept-language']);
+      const tWeb = createTranslator(language);
       if (url.pathname !== '/callback') {
         res.writeHead(404);
         res.end();
@@ -136,7 +140,7 @@ export function waitForOAuthCode(
 
       if (url.searchParams.get('state') !== expectedState) {
         res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
-        res.end('Invalid OAuth state');
+        res.end(tWeb('web.invalidState'));
         return;
       }
 
@@ -145,24 +149,24 @@ export function waitForOAuthCode(
 
       if (error) {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-        res.end(`<h1>Authentication failed</h1><p>${escapeHtml(error)}</p><p>You can close this tab.</p>`);
-        finish(new Error(`Auth failed: ${error}`));
+        res.end(`<html lang="${language}"><body><h1>${escapeHtml(tWeb('web.failedTitle'))}</h1><p>${escapeHtml(error)}</p><p>${escapeHtml(tWeb('web.closeTab'))}</p></body></html>`);
+        finish(new Error(tCli('auth.failed', { error })));
         return;
       }
 
       if (!code) {
-        res.writeHead(400);
-        res.end('Missing code');
+        res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end(tWeb('web.missingCode'));
         return;
       }
 
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(`
-        <html><body style="font-family:system-ui;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#0a0a0a;color:#fff">
+        <html lang="${language}"><body style="font-family:system-ui;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#0a0a0a;color:#fff">
           <div style="text-align:center">
             <h1 style="font-size:48px;margin-bottom:8px">✓</h1>
-            <h2>Authentication successful</h2>
-            <p style="color:#888">You can close this tab.</p>
+            <h2>${escapeHtml(tWeb('web.successTitle'))}</h2>
+            <p style="color:#888">${escapeHtml(tWeb('web.closeTab'))}</p>
           </div>
         </body></html>
       `);
@@ -181,11 +185,11 @@ export function waitForOAuthCode(
     server.once('error', err => {
       const code = (err as NodeJS.ErrnoException).code;
       const detail = code === 'EADDRINUSE' && !err.message.includes(code) ? `${code}: ${err.message}` : err.message;
-      finish(new Error(`OAuth callback server failed: ${detail}`, { cause: err }));
+      finish(new Error(tCli('auth.serverFailed', { detail }), { cause: err }));
     });
 
     timer = setTimeout(() => {
-      finish(new Error(`Authentication timed out (${Math.ceil(timeoutMs / 60_000)} min)`));
+      finish(new Error(tCli('auth.timedOut', { minutes: Math.ceil(timeoutMs / 60_000) })));
     }, timeoutMs);
 
     server.listen(port, host, () => {
@@ -193,8 +197,8 @@ export function waitForOAuthCode(
       const listeningPort = typeof address === 'object' && address ? address.port : port;
       options.onListening?.({ host, port: listeningPort });
 
-      log('\n🔐 Opening browser for Google authentication...\n');
-      log(`If the browser doesn't open, visit:\n${authUrl}\n`);
+      log(`\n${tCli('auth.opening')}\n`);
+      log(`${tCli('auth.visit')}\n${authUrl}\n`);
 
       try {
         launchBrowser(authUrl);
@@ -222,7 +226,7 @@ async function authGoogle(clientId: string, clientSecret: string): Promise<void>
   const { tokens } = await oauth2.getToken(code);
 
   if (!tokens.refresh_token) {
-    throw new Error('No refresh token received. Try revoking app access at https://myaccount.google.com/permissions and retry.');
+    throw new Error(tCli('auth.noRefreshToken', { url: 'https://myaccount.google.com/permissions' }));
   }
 
   saveToken({
@@ -232,8 +236,8 @@ async function authGoogle(clientId: string, clientSecret: string): Promise<void>
     savedAt: new Date().toISOString(),
   });
 
-  console.log(`✅ Google credentials saved to ${GOOGLE_TOKEN_PATH}`);
-  console.log('   The MCP server will auto-load these on next startup.');
+  console.log(tCli('auth.saved', { path: GOOGLE_TOKEN_PATH }));
+  console.log(tCli('auth.autoLoad'));
 }
 
 // ── CLI entry ──
@@ -242,8 +246,8 @@ async function main() {
 
   if (args[0] !== 'auth') {
     // Not an auth command — this file should not be the entry point for MCP server
-    console.error('Usage: app-publish-mcp auth google');
-    console.error('       app-publish-mcp auth google --client-id=XXX --client-secret=YYY');
+    console.error(`${tCli('auth.usage')} app-publish-mcp auth google`);
+    console.error('  app-publish-mcp auth google --client-id=XXX --client-secret=YYY');
     process.exit(1);
   }
 
@@ -264,18 +268,18 @@ async function main() {
     if (!clientSecret) clientSecret = process.env.GOOGLE_CLIENT_SECRET || '';
 
     if (!clientId || !clientSecret) {
-      console.error('❌ OAuth Client ID and Secret required.\n');
-      console.error('Get them from: Google Cloud Console → APIs & Services → Credentials → Create OAuth Client ID (Desktop app)\n');
-      console.error('Then run:');
+      console.error(`${tCli('auth.credentialsRequired')}\n`);
+      console.error(`${tCli('auth.getThemFrom', { path: 'Google Cloud Console → APIs & Services → Credentials → Create OAuth Client ID (Desktop app)' })}\n`);
+      console.error(tCli('auth.thenRun'));
       console.error('  app-publish-mcp auth google --client-id=YOUR_ID --client-secret=YOUR_SECRET\n');
-      console.error('Or set env vars: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET');
+      console.error(tCli('auth.orSetEnv', { vars: 'GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET' }));
       process.exit(1);
     }
 
     await authGoogle(clientId, clientSecret);
   } else {
-    console.error(`Unknown auth target: ${target}`);
-    console.error('Available: google');
+    console.error(tCli('auth.unknownTarget', { target }));
+    console.error(tCli('auth.available', { targets: 'google' }));
     process.exit(1);
   }
 }

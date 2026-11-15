@@ -4,6 +4,9 @@ import { createServer, get } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
+
+// 英語のメッセージを検証するため、CLI の言語を固定する（開発機のロケールに依存させない）。
+process.env.APP_PUBLISH_MCP_LANGUAGE = 'en';
 import { AppleApiError, AppleClient } from '../src/apple/client.js';
 import { appleTools } from '../src/apple/tools.js';
 import { getBrowserOpenCommand, parseSavedGoogleToken, waitForOAuthCode } from '../src/auth.js';

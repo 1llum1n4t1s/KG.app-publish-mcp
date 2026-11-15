@@ -11,6 +11,7 @@ import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { z } from 'zod';
+import { tCli } from './i18n.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -279,11 +280,12 @@ server.resource(
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error(`app-publish-mcp running (Apple: ${appleClient ? 'OK' : 'N/A'}, Google: ${googleClient ? 'OK' : 'N/A'})`);
+  const status = (client: unknown): string => tCli(client ? 'server.statusOk' : 'server.statusNa');
+  console.error(tCli('server.running', { apple: status(appleClient), google: status(googleClient) }));
 }
 
 main().catch((err) => {
-  console.error('Fatal:', err);
+  console.error(tCli('server.fatal'), err);
   process.exit(1);
 });
 

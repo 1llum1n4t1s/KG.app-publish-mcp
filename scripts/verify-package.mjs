@@ -10,6 +10,6 @@ for (const version of [pack.version, server.version, server.packages[0].version,
 const archived = JSON.parse(execFileSync('tar', ['-xOf', pack.filename, 'package/package.json'], { encoding: 'utf8' }));
 assert.equal(archived.name, pkg.name);
 assert.equal(archived.version, pkg.version);
-for (const required of ['dist/cli.js', 'dist/index.js', 'dist/google/client.js', 'dist/apple/client.js', 'LICENSE', 'README.md']) assert.ok(pack.files.some(f => f.path === required), required);
+for (const required of ['dist/cli.js', 'dist/index.js', 'dist/google/client.js', 'dist/apple/client.js', 'dist/i18n.js', 'dist/locales/en.json', 'dist/locales/ja.json', 'LICENSE', 'README.md']) assert.ok(pack.files.some(f => f.path === required), required);
 for (const file of pack.files) assert.ok(!/(^|\/)(?:\.env|secrets\.json|test|node_modules)(\/|$)|\.(?:p8|pem|key|pfx)$/.test(file.path), file.path);
 console.error(`Verified ${pack.filename}: ${pack.files.length} files, integrity=${pack.integrity}`);
