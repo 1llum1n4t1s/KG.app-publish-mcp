@@ -1,16 +1,24 @@
 name: Dependency validation
 
+# main への push と全 PR（Dependabot 以外も）で lint・test・stdio テストを走らせる。
+# release/** の公開 workflow も npm-publish.yml で同じ検証を公開前に行う。
 on:
+  push:
+    branches: [main]
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
+
+# 同じ PR の古い実行は取り消す（main push は取り消さず全件検証する）。
+concurrency:
+  group: validate-${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
 
 jobs:
   validate:
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.user.login == 'dependabot[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     defaults:
