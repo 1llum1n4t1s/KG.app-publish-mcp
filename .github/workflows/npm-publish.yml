@@ -1,12 +1,12 @@
 name: Publish to npm
 
 # 公開は native C# / .NET / cosign（PowerShell入口）と npm Trusted Publishing の OIDC 認証を使う。
-# 発火: release/x.y.z ブランチの push、または手動実行。
+# 発火: main のコミットに付けた軽量タグ vx.y.z の push、または既存タグを --ref に指定した手動実行（やり直し専用）。
 
 on:
   push:
-    branches:
-      - "release/**"
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
   workflow_dispatch:
 
 permissions:
@@ -39,15 +39,29 @@ jobs:
           unzip -q "$RUNNER_TEMP/bun.zip" -d "$RUNNER_TEMP/bun"
           echo "$RUNNER_TEMP/bun/bun-linux-x64-baseline" >> "$GITHUB_PATH"
 
-      - name: Verify release branch matches package.json version
-        if: startsWith(github.ref_name, 'release/')
+      # 公開は main の祖先 commit に付けた軽量タグ vx.y.z からだけ行う。push / workflow_dispatch のどちらでも必須で、skip させない。
+      - name: Verify release tag matches package.json version
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          BR="${GITHUB_REF_NAME#release/}"
+          set -euo pipefail
+          [[ "$GITHUB_REF_TYPE" == tag ]] || { echo "::error::タグ以外では公開しない: $GITHUB_REF"; exit 1; }
+          [[ "$GITHUB_REF_NAME" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || { echo "::error::版タグの形ではない: $GITHUB_REF_NAME"; exit 1; }
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::GITHUB_SHA が不正"; exit 1; }
+          # 軽量タグで、いまもこの commit を指すこと
+          [[ "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$GITHUB_REF_NAME" --jq '.object.type+" "+.object.sha')" == "commit $GITHUB_SHA" ]] \
+            || { echo "::error::タグが $GITHUB_SHA を指す軽量タグではない"; exit 1; }
+          # 既定ブランチの祖先であること（compare API）
+          default="$(gh api "repos/$GITHUB_REPOSITORY" --jq .default_branch)"
+          cmp="$(gh api "repos/$GITHUB_REPOSITORY/compare/$GITHUB_SHA...$default?per_page=1" --jq '.status+" "+(.behind_by|tostring)')"
+          [[ "$cmp" == "ahead 0" || "$cmp" == "identical 0" ]] || { echo "::error::$default の祖先ではない ($cmp)"; exit 1; }
+          # package.json の版との一致
           PKG=$(bun -p "require('./package.json').version")
-          if [ "$BR" != "$PKG" ]; then
-            echo "::error::Release branch '$BR' does not match package.json version '$PKG'"
+          if [ "$GITHUB_REF_NAME" != "v$PKG" ]; then
+            echo "::error::Release tag '$GITHUB_REF_NAME' does not match package.json version '$PKG'"
             exit 1
           fi
+          echo "Release tag and package.json agree on $PKG"
 
       - name: Install dependencies
         run: bun install --frozen-lockfile

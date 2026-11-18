@@ -61,9 +61,9 @@ This repository provides the `@kagayoi/app-publish-mcp` stdio MCP server. Read
   `APP_PUBLISH_MCP_LANGUAGE` → `LC_ALL` → `LC_MESSAGES` → `LANG` → the OS
   locale → English; the browser page uses `Accept-Language`. Tests that assert
   English messages set `APP_PUBLISH_MCP_LANGUAGE=en`.
-- Keep `package.json`, `server.json`, and release branch versions synchronized
+- Keep `package.json`, `server.json`, and the release tag version synchronized
   for a release. The publish workflow requires
-  `release/<version>` to match `package.json` and publishes using GitHub OIDC Trusted Publishing. The publication workflow runs install, build, pack, verification and OIDC publication
+  the lightweight tag `v<version>` (pushed on a `main` commit; no release branch, no GitHub Release) to match `package.json` and publishes using GitHub OIDC Trusted Publishing. The publication workflow runs install, build, pack, verification and OIDC publication
   on GitHub-hosted ubuntu-latest to meet npm provenance requirements. Before
   build and pack it also runs lint, `test` and `test:stdio`, and a failure
   blocks publication. Dependency validation runs on every PR and every push to

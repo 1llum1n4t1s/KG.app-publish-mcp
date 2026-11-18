@@ -12,8 +12,8 @@ $networkGuard.Verify()
 # 現役PowerShell入口も、合成したprovenance入力で確認する。元の環境は必ず戻す。
 $context = @{
     GITHUB_SERVER_URL = 'https://github.com'; GITHUB_REPOSITORY = 'fixture/package'
-    GITHUB_WORKFLOW_REF = 'fixture/package/.github/workflows/publish.yml@refs/heads/release/1.2.3'
-    GITHUB_REF = 'refs/heads/release/1.2.3'; GITHUB_REF_NAME = 'release/1.2.3'
+    GITHUB_WORKFLOW_REF = 'fixture/package/.github/workflows/publish.yml@refs/tags/v1.2.3'
+    GITHUB_REF = 'refs/tags/v1.2.3'; GITHUB_REF_NAME = 'v1.2.3'; GITHUB_REF_TYPE = 'tag'
     GITHUB_SHA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'; GITHUB_EVENT_NAME = 'push'
     GITHUB_REPOSITORY_ID = '1'; GITHUB_REPOSITORY_OWNER_ID = '2'; RUNNER_ENVIRONMENT = 'github-hosted'
     GITHUB_RUN_ID = '3'; GITHUB_RUN_ATTEMPT = '4'

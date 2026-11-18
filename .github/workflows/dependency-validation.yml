@@ -1,7 +1,7 @@
 name: Dependency validation
 
 # main への push と全 PR（Dependabot 以外も）で lint・test・stdio テストを走らせる。
-# release/** の公開 workflow も npm-publish.yml で同じ検証を公開前に行う。
+# 配信タグ（vx.y.z）の公開 workflow も npm-publish.yml で同じ検証を公開前に行う。
 on:
   push:
     branches: [main]

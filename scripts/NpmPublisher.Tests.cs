@@ -92,8 +92,8 @@ namespace Kagayoi.Npm
         }
         private static Dictionary<string, string> Context(string root) => new Dictionary<string, string>
         {
-            ["GITHUB_SERVER_URL"] = "https://github.com", ["GITHUB_REPOSITORY"] = "fixture/package", ["GITHUB_WORKFLOW_REF"] = "fixture/package/.github/workflows/publish.yml@refs/heads/release/1.2.3",
-            ["GITHUB_REF"] = "refs/heads/release/1.2.3", ["GITHUB_REF_NAME"] = "release/1.2.3", ["GITHUB_SHA"] = new string('a', 40),
+            ["GITHUB_SERVER_URL"] = "https://github.com", ["GITHUB_REPOSITORY"] = "fixture/package", ["GITHUB_WORKFLOW_REF"] = "fixture/package/.github/workflows/publish.yml@refs/tags/v1.2.3",
+            ["GITHUB_REF"] = "refs/tags/v1.2.3", ["GITHUB_REF_NAME"] = "v1.2.3", ["GITHUB_REF_TYPE"] = "tag", ["GITHUB_SHA"] = new string('a', 40),
             ["GITHUB_EVENT_NAME"] = "push", ["GITHUB_REPOSITORY_ID"] = "1", ["GITHUB_REPOSITORY_OWNER_ID"] = "2", ["RUNNER_ENVIRONMENT"] = "github-hosted",
             ["GITHUB_RUN_ID"] = "3", ["GITHUB_RUN_ATTEMPT"] = "4", ["GITHUB_ACTIONS"] = "true", ["RUNNER_TEMP"] = root,
             ["ACTIONS_ID_TOKEN_REQUEST_URL"] = "https://fixture.actions.githubusercontent.com/idtoken?api-version=1", ["ACTIONS_ID_TOKEN_REQUEST_TOKEN"] = "fixture-request-token"
@@ -260,8 +260,12 @@ namespace Kagayoi.Npm
                 var invalid = Archive(root, item.Item1, item.Item2, item.Item3, item.Item4);
                 Fails(() => Publisher.Prepare(invalid, Integrity(invalid), null, env), item.Item1 == "duplicate" ? "Duplicate" : item.Item1 == "version" ? "Invalid package" : "public npm");
             }
-            var wrongContext = new Dictionary<string, string>(env); wrongContext["GITHUB_REF_NAME"] = "release/9.9.9";
-            Fails(() => Publisher.Prepare(file, Integrity(file), null, wrongContext), "Release branch");
+            var wrongContext = new Dictionary<string, string>(env); wrongContext["GITHUB_REF_NAME"] = "v9.9.9";
+            Fails(() => Publisher.Prepare(file, Integrity(file), null, wrongContext), "Release tag");
+            wrongContext = new Dictionary<string, string>(env); wrongContext["GITHUB_REF_TYPE"] = "branch";
+            Fails(() => Publisher.Prepare(file, Integrity(file), null, wrongContext), "Release tag");
+            wrongContext = new Dictionary<string, string>(env); wrongContext["GITHUB_REF_NAME"] = "release/1.2.3"; wrongContext["GITHUB_REF_TYPE"] = "branch";
+            Fails(() => Publisher.Prepare(file, Integrity(file), null, wrongContext), "Release tag");
             wrongContext = new Dictionary<string, string>(env); wrongContext["GITHUB_WORKFLOW_REF"] = "other/repo/.github/workflows/publish.yml@main";
             Fails(() => Publisher.Prepare(file, Integrity(file), null, wrongContext), "workflow identity");
 

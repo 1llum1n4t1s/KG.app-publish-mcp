@@ -94,8 +94,8 @@ namespace Kagayoi.Npm
             var version = Text(manifest["version"]);
             Require(Regex.IsMatch(name, @"^(@[a-z0-9][a-z0-9._-]*/)?[a-z0-9][a-z0-9._-]*$") && Regex.IsMatch(version, @"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$"), "Invalid package name or release version.");
             var refName = Value(env, "GITHUB_REF_NAME");
-            Require(!refName.StartsWith("release/", StringComparison.OrdinalIgnoreCase) || refName == "release/" + version, "Release branch and archive version differ.");
-            foreach (var key in new[] { "GITHUB_SERVER_URL", "GITHUB_REPOSITORY", "GITHUB_WORKFLOW_REF", "GITHUB_REF", "GITHUB_SHA", "GITHUB_EVENT_NAME", "GITHUB_REPOSITORY_ID", "GITHUB_REPOSITORY_OWNER_ID", "RUNNER_ENVIRONMENT", "GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT" })
+            Require(Value(env, "GITHUB_REF_TYPE") == "tag" && refName == "v" + version, "Release tag and archive version differ.");
+            foreach (var key in new[] { "GITHUB_SERVER_URL", "GITHUB_REPOSITORY", "GITHUB_WORKFLOW_REF", "GITHUB_REF", "GITHUB_REF_TYPE", "GITHUB_SHA", "GITHUB_EVENT_NAME", "GITHUB_REPOSITORY_ID", "GITHUB_REPOSITORY_OWNER_ID", "RUNNER_ENVIRONMENT", "GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT" })
                 Require(!string.IsNullOrEmpty(Value(env, key)), "Missing GitHub provenance context: " + key);
             Require(Value(env, "GITHUB_SERVER_URL") == "https://github.com", "Only github.com hosted provenance is supported.");
             var repo = Value(env, "GITHUB_REPOSITORY");

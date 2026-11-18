@@ -101,10 +101,12 @@ enforces this. User-facing language selection is documented in
 
 ## Package publication boundary
 
-`.github/workflows/npm-publish.yml` runs on pushes to `release/**` or manual
-dispatch. On a release branch it checks the branch suffix against the package
-version, then installs the `bun.lock` dependencies and builds before packaging.
-Manual dispatch on other branches does not run that version-name check.
+`.github/workflows/npm-publish.yml` runs on pushes of a lightweight tag `vX.Y.Z` on a `main` commit, or on manual
+dispatch with an existing tag as `--ref` (re-run only). It unconditionally requires a tag ref, the strict
+`vX.Y.Z` form, a lightweight tag that points at the run's commit, a commit that is an
+ancestor of the default branch, and a tag equal to `v<package.json version>`; then it installs
+the `bun.lock` dependencies and builds before packaging. The native publisher repeats the
+tag/version check (`GITHUB_REF_TYPE == tag` and `GITHUB_REF_NAME == v<version>`).
 
 The workflow runs `bun pm pack` and passes the tarball to
 `scripts/verify-bun-package.ps1`. The verifier checks archived entry types,
@@ -140,7 +142,7 @@ are checked before upload. Existing versions require identical integrity and
 valid npm registry provenance metadata. A successful PUT header means npm
 acceptance without parsing its body or waiting for public propagation. Unknown
 outcomes fail without retrying PUT. Source-hash-specific namespaces preserve
-the PowerShell source reload boundary. The workflow filename and existing release/manual conditions remain unchanged,
+the PowerShell source reload boundary. The workflow filename and manual (re-run) condition remains unchanged and the release trigger is the version tag,
 so the existing npm Trusted Publisher registration stays applicable.
 
 Release validation commands and version synchronization requirements are defined
